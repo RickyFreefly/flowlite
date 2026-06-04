@@ -1,0 +1,139 @@
+/* Contenedor principal */
+.cierre-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: "Poppins", sans-serif;
+}
+
+/* Tarjeta de encabezado */
+.card-header {
+  background: #f8faff;
+  padding: 18px 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  margin-bottom: 20px;
+}
+.card-header h2 {
+  color: #333;
+  font-weight: 600;
+}
+.card-header span {
+  color: #007bff;
+}
+
+/* Sección detalle */
+.card-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.card-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+/* Tabla */
+.table-wrapper {
+  overflow-x: auto;
+}
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.styled-table thead {
+  background: #f2f4f8;
+}
+.styled-table th, .styled-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e6e6e6;
+}
+.styled-table tbody tr:hover {
+  background: #f9f9ff;
+}
+.ingreso td {
+  color: #198754;
+}
+.egreso td {
+  color: #dc3545;
+}
+.text-center {
+  text-align: center;
+  color: #777;
+}
+
+/* Totales */
+.card-summary {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.card-summary h3 {
+  margin-bottom: 20px;
+  color: #333;
+}
+.summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 20px;
+}
+.summary-item {
+  flex: 1;
+  min-width: 220px;
+  text-align: center;
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+.summary-item:hover {
+  transform: translateY(-3px);
+}
+.summary-item h4 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #555;
+}
+.summary-item .valor {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin-top: 8px;
+}
+.summary-item.ingresos .valor {
+  color: #28a745;
+}
+.summary-item.egresos .valor {
+  color: #dc3545;
+}
+.summary-item.saldo-neto .valor {
+  color: #007bff;
+}
+
+/* ====== Botón de volver ====== */
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.btn-volver {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-volver:hover {
+  background-color: #0056b3;
+  transform: translateY(-2px);
+}

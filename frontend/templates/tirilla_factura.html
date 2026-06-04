@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Tirilla #{{ factura.idfactura }}</title>
+
+  <style>
+    @page {
+      size: 58mm auto;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .ticket {
+      width: 58mm;
+      max-width: 58mm;
+      padding: 4mm 3mm;
+      margin: 0 auto;
+    }
+
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .bold { font-weight: 700; }
+    .small { font-size: 9px; }
+
+    .logo-box {
+      text-align: center;
+      margin-bottom: 2mm;
+    }
+
+    .logo-box img {
+      max-width: 38mm;
+      max-height: 20mm;
+      object-fit: contain;
+      display: inline-block;
+      filter: grayscale(100%) contrast(180%);
+    }
+
+    .empresa-nombre {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-bottom: 1mm;
+    }
+
+    .subtitle {
+      font-size: 10px;
+      margin-bottom: 1mm;
+    }
+
+    .line {
+      border-top: 1px dashed #000;
+      margin: 3mm 0;
+    }
+
+    .row,
+    .total-row,
+    .item-detail {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      margin-bottom: 1mm;
+    }
+
+    .row .label {
+      flex: 1;
+    }
+
+    .row .value {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .item {
+      margin-bottom: 2mm;
+    }
+
+    .item-name {
+      font-weight: 700;
+      text-transform: uppercase;
+      word-break: break-word;
+    }
+
+    .total-row {
+      font-size: 13px;
+      font-weight: 800;
+      margin-top: 2mm;
+    }
+
+    .no-print {
+      margin: 12px auto;
+      width: 58mm;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .btn {
+      border: 1px solid #111;
+      background: #fff;
+      color: #111;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+
+      body,
+      .ticket {
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="no-print">
+    <button class="btn" onclick="window.print()">Imprimir</button>
+    <button class="btn" onclick="window.close()">Cerrar</button>
+  </div>
+
+  <div class="ticket">
+
+    {# 
+      Por ahora usa logo fijo desde static.
+      Más adelante este mismo punto puede recibir logo desde BD:
+      empresa_logo_url.
+    #}
+    {% set logo_url = empresa_logo_url if empresa_logo_url else url_for('static', filename='img/logo_trocitos_grill.png') %}
+
+    <!-- ENCABEZADO -->
+    <div class="center">
+      <div class="logo-box">
+        <img src="{{ logo_url }}" alt="Logo empresa">
+      </div>
+
+      <div class="empresa-nombre">
+        {{ empresa_nombre or "FlowLite" }}
+      </div>
+
+      <div class="subtitle">Comprobante de pago</div>
+      <div class="subtitle">Factura #{{ factura.idfactura }}</div>
+
+      {% if factura.siigo_number %}
+        <div class="subtitle">Siigo: {{ factura.siigo_number }}</div>
+      {% endif %}
+    </div>
+
+    <div class="line"></div>
+
+    <!-- DATOS DOCUMENTO -->
+    <div class="row">
+      <span class="label">Fecha:</span>
+      <span class="value">
+        {{ factura.createdat[:10] if factura.createdat else datetime.now().strftime('%Y-%m-%d') }}
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">Estado:</span>
+      <span class="value">{{ factura.estado or "-" }}</span>
+    </div>
+
+    <div class="row">
+      <span class="label">Usuario:</span>
+      <span class="value">{{ username or "-" }}</span>
+    </div>
+
+    <div class="line"></div>
+
+    <!-- CLIENTE -->
+    <div class="bold">CLIENTE</div>
+
+    <div>
+      {{ factura.cliente.nombre_cliente if factura.cliente else factura.nombre_cliente or "Cliente sin nombre" }}
+    </div>
+
+    <div>
+      ID:
+      {{ factura.cliente.identificacion if factura.cliente else factura.identificacion or "-" }}
+    </div>
+
+    <div class="line"></div>
+
+    <!-- DETALLE -->
+    <div class="bold">DETALLE</div>
+
+    {% for d in factura.detalles %}
+      <div class="item">
+        <div class="item-name">
+          {{ d.nombre or d.descripcion or "Producto" }}
+        </div>
+
+        <div class="item-detail">
+          <span>
+            {{ "{:,.0f}".format(d.cantidad|float).replace(",", ".") }}
+            x
+            ${{ "{:,.0f}".format(d.valorunitario|float).replace(",", ".") }}
+          </span>
+
+          <span>
+            ${{ "{:,.0f}".format(d.subtotal|float).replace(",", ".") }}
+          </span>
+        </div>
+      </div>
+    {% endfor %}
+
+    <div class="line"></div>
+
+    <!-- TOTALES -->
+    {% set total_pagado = factura.pagos|sum(attribute='valor') if factura.pagos else 0 %}
+    {% set saldo = (factura.total or 0) - total_pagado %}
+
+    <div class="total-row">
+      <span>TOTAL</span>
+      <span>${{ "{:,.0f}".format(factura.total|float).replace(",", ".") }}</span>
+    </div>
+
+    <div class="row">
+      <span class="label">Pagado:</span>
+      <span class="value">${{ "{:,.0f}".format(total_pagado|float).replace(",", ".") }}</span>
+    </div>
+
+    <div class="row">
+      <span class="label">Saldo:</span>
+      <span class="value">${{ "{:,.0f}".format(saldo|float).replace(",", ".") }}</span>
+    </div>
+
+    <div class="line"></div>
+
+    <!-- PAGOS -->
+    <div class="bold">PAGOS</div>
+
+    {% if factura.pagos %}
+      {% for p in factura.pagos %}
+        <div class="row">
+          <span class="label">{{ p.medio or p.idmedio or "Medio" }}</span>
+          <span class="value">${{ "{:,.0f}".format(p.valor|float).replace(",", ".") }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="small">Sin pagos registrados.</div>
+    {% endif %}
+
+    <div class="line"></div>
+
+    <!-- PIE -->
+    <div class="center small">
+      Gracias por su compra
+      <br>
+      Este documento es una tirilla de pago.
+      <br>
+      No reemplaza la factura electrónica.
+    </div>
+
+    <div class="line"></div>
+
+    <div class="center small">
+      Generado desde FlowLite
+    </div>
+
+  </div>
+
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () {
+        window.print();
+      }, 500);
+    });
+  </script>
+
+</body>
+</html>

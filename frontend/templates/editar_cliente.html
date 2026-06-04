@@ -1,0 +1,733 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Cliente{% endblock %}
+
+{% block content %}
+
+{% set tipo_cliente = cliente.tipo_local or cliente.tipo or 'NATURAL' %}
+
+<div class="cliente-edit-page">
+
+  <!-- =========================
+       ENCABEZADO
+  ========================== -->
+  <section class="cliente-hero">
+    <div>
+      <a href="{{ url_for('clientes.listar_clientes') }}" class="back-link">
+        ← Volver a clientes
+      </a>
+
+      <h1>Editar Cliente</h1>
+
+      <p>
+        Actualiza la información del cliente para reservas, facturación y trazabilidad operativa.
+      </p>
+    </div>
+
+    <div class="hero-badge">
+      {{ tipo_cliente }}
+    </div>
+  </section>
+
+  <!-- =========================
+       FORMULARIO
+  ========================== -->
+  <form method="post"
+        action="{{ url_for('clientes.actualizar_cliente', idCliente=cliente.idcliente) }}"
+        class="cliente-form"
+        id="editarClienteForm">
+
+    <!-- =========================
+         INFORMACIÓN PRINCIPAL
+    ========================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Información principal</h2>
+          <p>Define si el cliente es persona natural o jurídica y actualiza su identificación.</p>
+        </div>
+      </div>
+
+      <div class="type-switch">
+
+        <label class="type-option">
+          <input type="radio"
+                 name="tipo_visual"
+                 value="NATURAL"
+                 {% if tipo_cliente == "NATURAL" %}checked{% endif %}
+                 onclick="setTipoCliente('NATURAL')">
+          <span class="type-icon">👤</span>
+          <span>
+            <strong>Persona natural</strong>
+            <small>Cliente con nombres y apellidos.</small>
+          </span>
+        </label>
+
+        <label class="type-option">
+          <input type="radio"
+                 name="tipo_visual"
+                 value="JURIDICA"
+                 {% if tipo_cliente == "JURIDICA" %}checked{% endif %}
+                 onclick="setTipoCliente('JURIDICA')">
+          <span class="type-icon">🏢</span>
+          <span>
+            <strong>Persona jurídica</strong>
+            <small>Empresa con NIT y razón social.</small>
+          </span>
+        </label>
+
+      </div>
+
+      <input type="hidden" name="tipo" id="tipo" value="{{ tipo_cliente }}">
+
+      <div class="form-grid two-cols">
+
+        <div class="field">
+          <label for="id_type">Tipo documento</label>
+          <select name="id_type" id="id_type" required>
+            <option value="11" {% if cliente.id_type|string == "11" %}selected{% endif %}>Registro Civil</option>
+            <option value="12" {% if cliente.id_type|string == "12" %}selected{% endif %}>Tarjeta de Identidad</option>
+            <option value="13" {% if cliente.id_type|string == "13" %}selected{% endif %}>Cédula de Ciudadanía</option>
+            <option value="21" {% if cliente.id_type|string == "21" %}selected{% endif %}>Tarjeta de Extranjería</option>
+            <option value="22" {% if cliente.id_type|string == "22" %}selected{% endif %}>Cédula de Extranjería</option>
+            <option value="31" {% if cliente.id_type|string == "31" %}selected{% endif %}>NIT</option>
+            <option value="41" {% if cliente.id_type|string == "41" %}selected{% endif %}>Pasaporte</option>
+            <option value="42" {% if cliente.id_type|string == "42" %}selected{% endif %}>Sin identificación del exterior</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Identificación</label>
+          <div class="readonly-box">
+            <strong>
+              {% if tipo_cliente == "JURIDICA" %}
+                NIT {{ cliente.identificacion or '—' }}
+                {% if cliente.check_digit %}-{{ cliente.check_digit }}{% endif %}
+              {% else %}
+                CC {{ cliente.identificacion or '—' }}
+              {% endif %}
+            </strong>
+          </div>
+          <small class="field-help">
+            La identificación se muestra como referencia. Si necesitas cambiarla, conviene hacerlo con control administrativo.
+          </small>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- =========================
+         DATOS DEL CLIENTE
+    ========================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Datos del cliente</h2>
+          <p>Completa el nombre o razón social según el tipo de cliente.</p>
+        </div>
+      </div>
+
+      <div id="naturalFields" class="natural-section">
+        <div class="form-grid two-cols">
+          <div class="field">
+            <label for="nombres">Nombres</label>
+            <input type="text"
+                   name="nombres"
+                   id="nombres"
+                   value="{{ cliente.nombres or '' }}"
+                   placeholder="Nombres"
+                   style="text-transform: uppercase;">
+          </div>
+
+          <div class="field">
+            <label for="apellidos">Apellidos</label>
+            <input type="text"
+                   name="apellidos"
+                   id="apellidos"
+                   value="{{ cliente.apellidos or '' }}"
+                   placeholder="Apellidos"
+                   style="text-transform: uppercase;">
+          </div>
+        </div>
+      </div>
+
+      <div id="juridicaFields" class="juridica-section">
+        <div class="form-grid one-col">
+          <div class="field">
+            <label for="razonSocial">Razón social</label>
+            <input type="text"
+                   name="razonSocial"
+                   id="razonSocial"
+                   value="{{ cliente.razonsocial or '' }}"
+                   placeholder="Razón social"
+                   style="text-transform: uppercase;">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         UBICACIÓN Y CONTACTO
+    ========================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Ubicación y contacto</h2>
+          <p>Datos utilizados para facturación, reservas y comunicación con el cliente.</p>
+        </div>
+      </div>
+
+      <div class="form-grid two-cols">
+        <div class="field">
+          <label for="direccion">Dirección</label>
+          <input type="text"
+                 name="direccion"
+                 id="direccion"
+                 value="{{ cliente.direccion or '' }}"
+                 placeholder="Dirección"
+                 style="text-transform: uppercase;">
+        </div>
+
+        <div class="field">
+          <label for="telefono">Teléfono</label>
+          <input type="text"
+                 name="telefono"
+                 id="telefono"
+                 value="{{ cliente.telefono or '' }}"
+                 placeholder="Teléfono o celular">
+        </div>
+      </div>
+
+      <div class="form-grid two-cols">
+        <div class="field">
+          <label for="state_code">Código departamento</label>
+          <input type="text"
+                 name="state_code"
+                 id="state_code"
+                 value="{{ cliente.state_code or '' }}"
+                 placeholder="Ej: 11">
+        </div>
+
+        <div class="field">
+          <label for="city_code">Código ciudad</label>
+          <input type="text"
+                 name="city_code"
+                 id="city_code"
+                 value="{{ cliente.city_code or '' }}"
+                 placeholder="Ej: 11001">
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         CONTACTO
+    ========================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Contacto principal</h2>
+          <p>Persona o correo de contacto para notificaciones y soporte.</p>
+        </div>
+      </div>
+
+      <div class="form-grid two-cols">
+        <div class="field">
+          <label for="contact_first_name">Nombre contacto</label>
+          <input type="text"
+                 name="contact_first_name"
+                 id="contact_first_name"
+                 value="{{ cliente.contact_first_name or '' }}"
+                 placeholder="Nombre del contacto"
+                 style="text-transform: uppercase;">
+        </div>
+
+        <div class="field">
+          <label for="contact_last_name">Apellido contacto</label>
+          <input type="text"
+                 name="contact_last_name"
+                 id="contact_last_name"
+                 value="{{ cliente.contact_last_name or '' }}"
+                 placeholder="Apellido del contacto"
+                 style="text-transform: uppercase;">
+        </div>
+      </div>
+
+      <div class="form-grid one-col">
+        <div class="field">
+          <label for="contact_email">Email contacto</label>
+          <input type="email"
+                 name="contact_email"
+                 id="contact_email"
+                 value="{{ cliente.contact_email or cliente.email or '' }}"
+                 placeholder="correo@cliente.com">
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================
+         OBSERVACIONES
+    ========================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Observaciones</h2>
+          <p>Notas internas asociadas al cliente.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <textarea name="observacion"
+                  id="observacion"
+                  placeholder="Notas internas del cliente..."
+                  style="text-transform: uppercase;">{{ cliente.observacion or '' }}</textarea>
+      </div>
+    </section>
+
+    <!-- =========================
+         ACCIONES
+    ========================== -->
+    <section class="form-actions-sticky">
+      <div class="actions-note">
+        Revisa los datos antes de guardar los cambios.
+      </div>
+
+      <div class="actions-buttons">
+        <a href="{{ url_for('clientes.listar_clientes') }}" class="btn btn-light">
+          Cancelar
+        </a>
+
+        <button type="submit" class="btn btn-primary" id="btnGuardarCliente">
+          💾 Guardar cambios
+        </button>
+      </div>
+    </section>
+
+  </form>
+
+</div>
+
+<script>
+function setTipoCliente(tipo) {
+  const tipoInput = document.getElementById("tipo");
+  const idType = document.getElementById("id_type");
+
+  tipoInput.value = tipo;
+
+  if (tipo === "JURIDICA") {
+    idType.value = "31";
+    idType.disabled = false;
+  } else {
+    if (idType.value === "31") {
+      idType.value = "13";
+    }
+    idType.disabled = false;
+  }
+
+  aplicarVisibilidadTipo();
+}
+
+function aplicarVisibilidadTipo() {
+  const tipo = document.getElementById("tipo").value;
+  const naturalFields = document.getElementById("naturalFields");
+  const juridicaFields = document.getElementById("juridicaFields");
+
+  const naturalRadio = document.querySelector('input[name="tipo_visual"][value="NATURAL"]');
+  const juridicaRadio = document.querySelector('input[name="tipo_visual"][value="JURIDICA"]');
+
+  if (tipo === "JURIDICA") {
+    naturalFields.style.display = "none";
+    juridicaFields.style.display = "block";
+
+    if (naturalRadio) naturalRadio.checked = false;
+    if (juridicaRadio) juridicaRadio.checked = true;
+  } else {
+    naturalFields.style.display = "block";
+    juridicaFields.style.display = "none";
+
+    if (naturalRadio) naturalRadio.checked = true;
+    if (juridicaRadio) juridicaRadio.checked = false;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  aplicarVisibilidadTipo();
+
+  const form = document.getElementById("editarClienteForm");
+
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      return false;
+    }
+
+    form.dataset.submitted = "true";
+
+    const btn = document.getElementById("btnGuardarCliente");
+    if (btn) {
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = "⏳ Guardando...";
+      btn.disabled = true;
+      btn.classList.add("btn-loading");
+    }
+
+    return true;
+  });
+});
+</script>
+
+<style>
+.cliente-edit-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 22px 54px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* =========================
+   HERO
+========================= */
+.cliente-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.cliente-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.cliente-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-badge {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* =========================
+   FORM
+========================= */
+.cliente-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.section-heading h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.type-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.type-option {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 16px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: #f8fafc;
+}
+
+.type-option:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.type-option input {
+  accent-color: #2563eb;
+}
+
+.type-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: #e0f2fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.type-option strong {
+  display: block;
+  color: #111827;
+  font-size: 0.98rem;
+}
+
+.type-option small {
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.one-col {
+  grid-template-columns: 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field textarea {
+  min-height: 110px;
+  padding: 14px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.readonly-box {
+  min-height: 44px;
+  border-radius: 13px;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+}
+
+.readonly-box strong {
+  font-weight: 900;
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================
+   STICKY ACTIONS
+========================= */
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.actions-note {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.actions-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 920px) {
+  .cliente-hero,
+  .form-actions-sticky {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .two-cols,
+  .type-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-buttons {
+    justify-content: stretch;
+  }
+
+  .actions-buttons .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 620px) {
+  .cliente-edit-page {
+    padding: 22px 14px 42px;
+  }
+
+  .cliente-hero,
+  .form-card,
+  .form-actions-sticky {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .actions-buttons {
+    flex-direction: column;
+  }
+
+  .actions-buttons .btn,
+  .btn {
+    width: 100%;
+  }
+}
+</style>
+
+{% endblock %}

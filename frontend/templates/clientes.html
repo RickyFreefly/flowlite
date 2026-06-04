@@ -1,0 +1,1355 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+
+{% block content %}
+
+<div class="clientes-page">
+
+  <!-- =========================
+       ENCABEZADO
+  ========================== -->
+  <section class="clientes-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Gestión de Clientes</h1>
+      <p>
+        Crea, consulta y administra clientes para reservas, facturas y operación diaria.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-badge">
+      {{ empresa_nombre or 'Clientes' }}
+    </div>
+  </section>
+
+  <!-- =========================
+       FORMULARIO CREAR / ACTUALIZAR CLIENTE
+  ========================== -->
+  <section class="form-card">
+    <div class="section-heading">
+      <div>
+        <h2>Crear o actualizar cliente</h2>
+        <p>
+          Ingresa la identificación. Si el cliente ya existe dentro de la empresa activa, el sistema cargará sus datos para actualizarlo.
+        </p>
+      </div>
+    </div>
+
+    <form method="post"
+          action="{{ url_for('clientes.crear_cliente') }}"
+          class="cliente-form"
+          id="clienteForm">
+
+      <input type="hidden" name="idCliente" id="idCliente">
+      <input type="hidden" name="id_type" id="id_type">
+
+      <!-- Tipo de cliente -->
+      <div class="type-switch">
+        <label class="type-option">
+          <input type="radio"
+                 name="tipo_radio"
+                 value="NATURAL"
+                 checked
+                 onclick="document.getElementById('tipo').value='NATURAL'; ajustarFormulario();">
+          <span class="type-icon">👤</span>
+          <span>
+            <strong>Persona natural</strong>
+            <small>Cliente con nombres y apellidos.</small>
+          </span>
+        </label>
+
+        <label class="type-option">
+          <input type="radio"
+                 name="tipo_radio"
+                 value="JURIDICA"
+                 onclick="document.getElementById('tipo').value='JURIDICA'; ajustarFormulario();">
+          <span class="type-icon">🏢</span>
+          <span>
+            <strong>Persona jurídica</strong>
+            <small>Empresa con NIT y razón social.</small>
+          </span>
+        </label>
+      </div>
+
+      <!-- Este es el único campo tipo que se envía realmente al backend Flask -->
+      <select name="tipo" id="tipo" onchange="ajustarFormulario()" required hidden>
+        <option value="NATURAL" selected>Natural</option>
+        <option value="JURIDICA">Jurídica</option>
+      </select>
+
+      <!-- Identificación -->
+      <div class="form-grid two-cols">
+        <div class="field">
+          <label for="tipo_identificacion_select">Tipo de identificación</label>
+          <select id="tipo_identificacion_select" name="tipo_identificacion" required>
+            <option value="11">Registro Civil</option>
+            <option value="12">Tarjeta de Identidad</option>
+            <option value="13" selected>Cédula de Ciudadanía</option>
+            <option value="21">Tarjeta de Extranjería</option>
+            <option value="22">Cédula de Extranjería</option>
+            <option value="31">NIT</option>
+            <option value="41">Pasaporte</option>
+            <option value="42">Sin identificación del exterior</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="identificacion">Número de identificación</label>
+          <div class="input-with-dv">
+            <input type="text"
+                   name="identificacion"
+                   id="identificacion"
+                   class="form-control"
+                   placeholder="Ej: 1020304050"
+                   required>
+
+            <span class="dv-field juridica" style="display:none;">
+              <span class="dv-separator">-</span>
+              <input type="text"
+                     name="check_digit"
+                     maxlength="2"
+                     pattern="[0-9]{1,2}"
+                     title="Máximo 2 dígitos"
+                     placeholder="DV">
+            </span>
+          </div>
+          <small class="field-help">Al salir del campo, se validará si el cliente ya existe en la empresa activa.</small>
+        </div>
+      </div>
+
+      <!-- Natural -->
+      <div class="natural">
+        <div class="form-grid two-cols">
+          <div class="field">
+            <label for="nombres">Nombres</label>
+            <input type="text"
+                   name="nombres"
+                   id="nombres"
+                   placeholder="Nombres"
+                   style="text-transform: uppercase;">
+          </div>
+
+          <div class="field">
+            <label for="apellidos">Apellidos</label>
+            <input type="text"
+                   name="apellidos"
+                   id="apellidos"
+                   placeholder="Apellidos"
+                   style="text-transform: uppercase;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Jurídica -->
+      <div class="juridica" style="display:none;">
+        <div class="form-grid one-col">
+          <div class="field">
+            <label for="razonSocial">Razón social</label>
+            <input type="text"
+                   name="razonSocial"
+                   id="razonSocial"
+                   placeholder="Nombre de la empresa"
+                   style="text-transform: uppercase;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Datos comunes -->
+      <div class="form-grid two-cols">
+        <div class="field">
+          <label for="direccion">Dirección</label>
+          <input type="text"
+                 name="direccion"
+                 id="direccion"
+                 placeholder="Dirección del cliente"
+                 style="text-transform: uppercase;">
+        </div>
+
+        <div class="field">
+          <label for="telefono">Teléfono</label>
+          <input type="text"
+                 name="telefono"
+                 id="telefono"
+                 placeholder="Teléfono o celular">
+        </div>
+      </div>
+
+      <div class="form-grid one-col">
+        <div class="field">
+          <label for="contact_email">Correo electrónico</label>
+          <input type="email"
+                 name="contact_email"
+                 id="contact_email"
+                 placeholder="correo@cliente.com"
+                 required>
+        </div>
+      </div>
+
+      <div class="form-grid one-col">
+        <div class="field">
+          <label for="observacion">Observaciones</label>
+          <textarea name="observacion"
+                    id="observacion"
+                    rows="3"
+                    placeholder="Notas internas del cliente..."
+                    style="text-transform: uppercase;"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="btnGuardarCliente">
+          💾 Guardar cliente
+        </button>
+
+        <button type="button" class="btn btn-light" onclick="limpiarFormularioCliente()">
+          Limpiar
+        </button>
+      </div>
+
+    </form>
+  </section>
+
+  <!-- =========================
+       BUSCADOR
+  ========================== -->
+  <section class="search-card">
+    <div class="section-heading compact">
+      <div>
+        <h2>Buscar cliente</h2>
+        <p>Filtra el listado por número de identificación dentro de la empresa activa.</p>
+      </div>
+    </div>
+
+    <form method="get"
+          action="{{ url_for('clientes.listar_clientes') }}"
+          class="search-form">
+
+      <div class="field">
+        <label for="buscarListado">Identificación</label>
+        <input type="text"
+               id="buscarListado"
+               name="identificacion"
+               placeholder="Ingrese identificación..."
+               value="{{ identificacion or request.args.get('identificacion', '') }}">
+      </div>
+
+      <div class="search-actions">
+        <button type="submit" class="btn btn-primary">
+          🔎 Buscar
+        </button>
+
+        <a href="{{ url_for('clientes.listar_clientes') }}" class="btn btn-light">
+          Limpiar
+        </a>
+      </div>
+    </form>
+  </section>
+
+  <!-- =========================
+       LISTADO
+  ========================== -->
+  <section class="list-card">
+    <div class="list-header">
+      <div>
+        <h2>Listado de clientes</h2>
+        <p>
+          {% if clientes %}
+            Mostrando {{ clientes|length }} cliente(s).
+          {% else %}
+            No hay clientes para mostrar.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="clientes-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tipo</th>
+            <th>Identificación</th>
+            <th>Nombre / Razón social</th>
+            <th>Contacto</th>
+            <th>Dirección</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for c in clientes %}
+          {% set tipo_cliente = c.tipo or c.tipo_local %}
+          <tr>
+            <td data-label="ID">
+              <span class="client-id">#{{ c.id or c.idcliente }}</span>
+            </td>
+
+            <td data-label="Tipo">
+              <span class="badge-tipo {{ tipo_cliente }}">
+                {% if tipo_cliente == "JURIDICA" %}
+                  Jurídica
+                {% else %}
+                  Natural
+                {% endif %}
+              </span>
+            </td>
+
+            <td data-label="Identificación">
+              <strong>
+                {% if tipo_cliente == "JURIDICA" %}
+                  NIT {{ c.identificacion }}{% if c.check_digit %}-{{ c.check_digit }}{% endif %}
+                {% else %}
+                  CC {{ c.identificacion }}
+                {% endif %}
+              </strong>
+            </td>
+
+            <td data-label="Nombre / Razón social">
+              <div class="name-cell">
+                <strong>
+                  {% if tipo_cliente == "JURIDICA" %}
+                    {{ c.razonsocial or '-' }}
+                  {% else %}
+                    {{ c.nombres }} {{ c.apellidos }}
+                  {% endif %}
+                </strong>
+              </div>
+            </td>
+
+            <td data-label="Contacto">
+              <div class="contact-cell">
+                <span>{{ c.telefono or 'Sin teléfono' }}</span>
+
+                {% if c.contact_email or c.email %}
+                  <a href="mailto:{{ c.contact_email or c.email }}" class="email-link">
+                    {{ c.contact_email or c.email }}
+                  </a>
+                {% else %}
+                  <span class="muted">Sin email</span>
+                {% endif %}
+              </div>
+            </td>
+
+            <td data-label="Dirección">
+              <span class="address-cell">{{ c.direccion or '-' }}</span>
+            </td>
+
+            <td data-label="Acciones" class="actions-column">
+              <div class="acciones-grid">
+                <a href="{{ url_for('clientes.editar_cliente_form', idCliente=c.id or c.idcliente) }}"
+                   class="action-btn action-edit"
+                   title="Editar cliente">
+                  ✏️ Editar
+                </a>
+
+                <a href="{{ url_for('reservas.crear_reserva_form',
+                                    idCliente=c.id or c.idcliente,
+                                    identificacion=c.identificacion) }}"
+                   class="action-btn action-reserva"
+                   title="Crear reserva">
+                  📅 Reserva
+                </a>
+
+                <a href="{{ url_for('facturas.crear_factura_form',
+                                    idCliente=c.id or c.idcliente,
+                                    identificacion=c.identificacion) }}"
+                   class="action-btn action-factura action-full"
+                   title="Crear factura">
+                  🧾 Factura
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="7" class="empty-state">
+              <div class="empty-box">
+                <strong>No hay clientes registrados</strong>
+                <p>Crea un cliente desde el formulario superior para empezar.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- =========================
+         PAGINACIÓN
+    ========================== -->
+    {% if total_pages > 1 %}
+    <div class="pagination-container">
+
+      <a class="page-btn {% if page == 1 %}disabled{% endif %}"
+         href="{{ url_for('clientes.listar_clientes', page=page-1, identificacion=request.args.get('identificacion','')) }}">
+        ‹
+      </a>
+
+      {% if page > 3 %}
+        <a class="page-number"
+           href="{{ url_for('clientes.listar_clientes', page=1, identificacion=request.args.get('identificacion','')) }}">
+          1
+        </a>
+        <span class="ellipsis">…</span>
+      {% endif %}
+
+      {% for p in range(page-2, page+3) %}
+        {% if p > 0 and p <= total_pages %}
+          {% if p == page %}
+            <span class="page-number active">{{ p }}</span>
+          {% else %}
+            <a class="page-number"
+               href="{{ url_for('clientes.listar_clientes', page=p, identificacion=request.args.get('identificacion','')) }}">
+              {{ p }}
+            </a>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+
+      {% if page < total_pages - 2 %}
+        <span class="ellipsis">…</span>
+        <a class="page-number"
+           href="{{ url_for('clientes.listar_clientes', page=total_pages, identificacion=request.args.get('identificacion','')) }}">
+          {{ total_pages }}
+        </a>
+      {% endif %}
+
+      <a class="page-btn {% if page == total_pages %}disabled{% endif %}"
+         href="{{ url_for('clientes.listar_clientes', page=page+1, identificacion=request.args.get('identificacion','')) }}">
+        ›
+      </a>
+
+    </div>
+    {% endif %}
+
+  </section>
+
+</div>
+
+<!-- =========================
+     SCRIPT
+========================== -->
+<script>
+function ajustarFormulario() {
+  const tipo = document.getElementById("tipo").value;
+  const naturalFields = document.querySelectorAll(".natural");
+  const juridicaFields = document.querySelectorAll(".juridica");
+  const idType = document.getElementById("id_type");
+  const tipoSelect = document.getElementById("tipo_identificacion_select");
+  const dvField = document.querySelectorAll(".dv-field");
+
+  const naturalRadio = document.querySelector('input[name="tipo_radio"][value="NATURAL"]');
+  const juridicaRadio = document.querySelector('input[name="tipo_radio"][value="JURIDICA"]');
+
+  if (tipo === "NATURAL") {
+    naturalFields.forEach(f => f.style.display = "block");
+    juridicaFields.forEach(f => f.style.display = "none");
+    dvField.forEach(f => f.style.display = "none");
+
+    tipoSelect.disabled = false;
+    tipoSelect.value = "13";
+
+    if (naturalRadio) naturalRadio.checked = true;
+    if (juridicaRadio) juridicaRadio.checked = false;
+
+  } else {
+    naturalFields.forEach(f => f.style.display = "none");
+    juridicaFields.forEach(f => f.style.display = "block");
+    dvField.forEach(f => f.style.display = "flex");
+
+    tipoSelect.value = "31";
+    tipoSelect.disabled = true;
+
+    if (naturalRadio) naturalRadio.checked = false;
+    if (juridicaRadio) juridicaRadio.checked = true;
+  }
+
+  idType.value = tipoSelect.value;
+}
+
+function limpiarFormularioCliente() {
+  const form = document.getElementById("clienteForm");
+
+  form.reset();
+
+  document.getElementById("idCliente").value = "";
+  document.getElementById("tipo").value = "NATURAL";
+  document.getElementById("id_type").value = "13";
+  document.getElementById("tipo_identificacion_select").disabled = false;
+  document.getElementById("tipo_identificacion_select").value = "13";
+
+  form.dataset.submitted = "false";
+
+  const btn = document.getElementById("btnGuardarCliente");
+  if (btn) {
+    btn.innerHTML = btn.dataset.originalText || "💾 Guardar cliente";
+    btn.disabled = false;
+    btn.classList.remove("btn-loading");
+  }
+
+  ajustarFormulario();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ajustarFormulario();
+
+  const tipoIdentificacion = document.getElementById("tipo_identificacion_select");
+  const tipo = document.getElementById("tipo");
+
+  tipoIdentificacion.addEventListener("change", e => {
+    document.getElementById("id_type").value = e.target.value;
+  });
+
+  tipo.addEventListener("change", ajustarFormulario);
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const identificacionInput = document.getElementById("identificacion");
+  const idClienteInput = document.getElementById("idCliente");
+
+  identificacionInput.addEventListener("blur", async function () {
+    const identificacion = identificacionInput.value.trim();
+    if (!identificacion) return;
+
+    try {
+      const resp = await fetch(`/clientes/buscar?identificacion=${encodeURIComponent(identificacion)}`);
+
+      if (!resp.ok) {
+        console.warn("No fue posible buscar el cliente. Estado:", resp.status);
+        return;
+      }
+
+      const data = await resp.json();
+
+      if (data.found) {
+        const c = data.cliente;
+
+        idClienteInput.value = c.idcliente || c.id || "";
+
+        const tipoCliente = c.tipo || c.tipo_local || (c.razonsocial ? "JURIDICA" : "NATURAL");
+
+        document.getElementById("tipo").value = tipoCliente;
+        ajustarFormulario();
+
+        document.getElementById("nombres").value = c.nombres || "";
+        document.getElementById("razonSocial").value = c.razonsocial || c.razonSocial || "";
+        document.getElementById("apellidos").value = c.apellidos || "";
+        document.getElementById("direccion").value = c.direccion || "";
+        document.getElementById("telefono").value = c.telefono || "";
+        document.getElementById("contact_email").value = c.contact_email || c.email || "";
+        document.getElementById("id_type").value = c.id_type || document.getElementById("id_type").value;
+
+        if (c.id_type) {
+          const tipoIdentificacion = document.getElementById("tipo_identificacion_select");
+          tipoIdentificacion.value = c.id_type;
+        }
+
+        if (c.check_digit) {
+          const dv = document.querySelector("input[name='check_digit']");
+          if (dv) dv.value = c.check_digit;
+        }
+
+      } else {
+        idClienteInput.value = "";
+      }
+
+    } catch (e) {
+      console.error("Error buscando cliente:", e);
+    }
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("clienteForm");
+
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      return false;
+    }
+
+    const identificacion = document.getElementById("identificacion").value.trim();
+    const tipo = document.getElementById("tipo").value;
+    const email = document.getElementById("contact_email").value.trim();
+
+    if (!identificacion) {
+      event.preventDefault();
+      alert("La identificación del cliente es obligatoria.");
+      return false;
+    }
+
+    if (!email) {
+      event.preventDefault();
+      alert("El correo electrónico del cliente es obligatorio.");
+      return false;
+    }
+
+    if (tipo === "NATURAL") {
+      const nombres = document.getElementById("nombres").value.trim();
+      const apellidos = document.getElementById("apellidos").value.trim();
+
+      if (!nombres || !apellidos) {
+        event.preventDefault();
+        alert("Para persona natural debes ingresar nombres y apellidos.");
+        return false;
+      }
+    }
+
+    if (tipo === "JURIDICA") {
+      const razonSocial = document.getElementById("razonSocial").value.trim();
+
+      if (!razonSocial) {
+        event.preventDefault();
+        alert("Para persona jurídica debes ingresar la razón social.");
+        return false;
+      }
+    }
+
+    form.dataset.submitted = "true";
+
+    const btn = document.getElementById("btnGuardarCliente");
+    if (btn) {
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = "⏳ Guardando...";
+      btn.disabled = true;
+      btn.classList.add("btn-loading");
+    }
+
+    return true;
+  });
+});
+</script>
+
+<!-- =========================
+     ESTILOS
+========================== -->
+<style>
+.clientes-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* =========================
+   HERO
+========================= */
+.clientes-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.clientes-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.clientes-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-badge {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================
+   CARDS
+========================= */
+.form-card,
+.search-card,
+.list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.section-heading.compact {
+  margin-bottom: 14px;
+}
+
+.section-heading h2,
+.list-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p,
+.list-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+/* =========================
+   FORM
+========================= */
+.cliente-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.type-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.type-option {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 16px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: #f8fafc;
+}
+
+.type-option:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.type-option input {
+  accent-color: #2563eb;
+}
+
+.type-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: #e0f2fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.type-option strong {
+  display: block;
+  color: #111827;
+  font-size: 0.98rem;
+}
+
+.type-option small {
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.one-col {
+  grid-template-columns: 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea,
+.search-form input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field textarea {
+  min-height: 96px;
+  padding: 14px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.search-form input:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.input-with-dv {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-with-dv > input {
+  flex: 1;
+}
+
+.dv-field {
+  align-items: center;
+  gap: 6px;
+}
+
+.dv-field input {
+  width: 80px;
+}
+
+.dv-separator {
+  color: #64748b;
+  font-weight: 900;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   SEARCH
+========================= */
+.search-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.search-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.btn,
+.action-btn,
+.page-btn,
+.page-number {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================
+   TABLE
+========================= */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.clientes-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1120px;
+}
+
+.clientes-table th:last-child,
+.clientes-table td:last-child {
+  width: 250px;
+  min-width: 250px;
+}
+
+.clientes-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.clientes-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.clientes-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.clientes-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.clientes-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.clientes-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.client-id {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 900;
+}
+
+.badge-tipo {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge-tipo.NATURAL {
+  background: #4f46e5;
+}
+
+.badge-tipo.JURIDICA {
+  background: #059669;
+}
+
+.name-cell strong {
+  text-transform: uppercase;
+  font-weight: 900;
+}
+
+.contact-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.email-link {
+  color: #2563eb;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.email-link:hover {
+  text-decoration: underline;
+}
+
+.muted {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.address-cell {
+  color: #334155;
+}
+
+/* =========================
+   ACTIONS
+========================= */
+.actions-column {
+  min-width: 250px;
+}
+
+.acciones-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.acciones-grid .action-btn {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  justify-content: center;
+  text-align: center;
+}
+
+.acciones-grid .action-full {
+  grid-column: 1 / -1;
+}
+
+.action-edit {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.action-edit:hover {
+  background: #fed7aa;
+}
+
+.action-reserva {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.action-reserva:hover {
+  background: #d1fae5;
+}
+
+.action-factura {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.action-factura:hover {
+  background: #dbeafe;
+}
+
+/* =========================
+   EMPTY
+========================= */
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* =========================
+   PAGINATION
+========================= */
+.pagination-container {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.page-btn,
+.page-number {
+  min-width: 40px;
+  height: 40px;
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.page-number.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.page-btn:hover,
+.page-number:hover {
+  background: #e5e7eb;
+}
+
+.page-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.ellipsis {
+  color: #64748b;
+  font-weight: 900;
+  padding: 0 4px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 980px) {
+  .clientes-hero {
+    flex-direction: column;
+  }
+
+  .two-cols,
+  .type-switch,
+  .search-form {
+    grid-template-columns: 1fr;
+  }
+
+  .search-actions {
+    justify-content: flex-start;
+  }
+
+  .hero-badge {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .clientes-page {
+    padding: 22px 14px 38px;
+  }
+
+  .clientes-hero,
+  .form-card,
+  .search-card,
+  .list-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .form-actions,
+  .search-actions {
+    flex-direction: column;
+  }
+
+  .btn,
+  .search-actions .btn {
+    width: 100%;
+  }
+
+  .clientes-table {
+    min-width: 0;
+  }
+
+  .clientes-table th:last-child,
+  .clientes-table td:last-child {
+    width: auto;
+    min-width: 0;
+  }
+
+  .clientes-table thead {
+    display: none;
+  }
+
+  .clientes-table,
+  .clientes-table tbody,
+  .clientes-table tr,
+  .clientes-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .clientes-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .clientes-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .clientes-table tbody td:last-child {
+    border-bottom: none;
+    display: block;
+    text-align: left;
+  }
+
+  .clientes-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .clientes-table tbody td:last-child::before {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .acciones-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .acciones-grid .action-full {
+    grid-column: auto;
+  }
+
+  .acciones-grid .action-btn {
+    width: 100%;
+  }
+
+  .input-with-dv {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dv-field {
+    width: 100%;
+  }
+
+  .dv-field input {
+    width: 100%;
+  }
+}
+</style>
+
+{% endblock %}

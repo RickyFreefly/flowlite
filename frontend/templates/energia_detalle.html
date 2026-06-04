@@ -1,0 +1,485 @@
+{% extends "base.html" %}
+{% block title %}Detalle de Energía{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">⚡ Detalle de Registro Energético</h1>
+      <p class="page-subtitle">
+        Consulta individual de lecturas, consumos y costos calculados.
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <a href="{{ url_for('energia.listar_energia') }}" class="btn-volver">⬅️ Volver</a>
+      <a href="{{ url_for('energia.resumen_energia') }}" class="btn-secondary">📊 Resumen</a>
+    </div>
+  </div>
+
+  <!-- ========================= ESTADO GENERAL ========================= -->
+  <div class="card">
+    <div class="detail-header">
+      <div>
+        <h2>Registro #{{ registro.idenergia_registro }}</h2>
+        <p>Fecha: <strong>{{ registro.fecha|string|replace("T05:00:00.000Z", "") }}</strong></p>
+      </div>
+
+      <span class="badge-estado {{ registro.estado }}">
+        {{ registro.estado }}
+      </span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <span>Usuario</span>
+        <strong>{{ registro.usuario or "-" }}</strong>
+      </div>
+
+      <div class="meta-item">
+        <span>Valor kWh</span>
+        <strong>${{ "{:,.0f}".format((registro.valor_kwh or 0)|float) }}</strong>
+      </div>
+
+      <div class="meta-item">
+        <span>Creado</span>
+        <strong>{{ registro.createdat|string|replace("T", " ")|replace(".000Z", "") }}</strong>
+      </div>
+
+      <div class="meta-item">
+        <span>Actualizado</span>
+        <strong>{{ registro.updatedat|string|replace("T", " ")|replace(".000Z", "") }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================= LECTURAS ========================= -->
+  <div class="card">
+    <h2>📟 Lecturas registradas</h2>
+
+    <div class="table-scroll">
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th>Lectura inicial</th>
+            <th>Lectura final</th>
+            <th>Consumo kWh</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr>
+            <td><strong>Total general</strong></td>
+            <td>{{ "%.3f"|format((registro.lectura_inicial_total or 0)|float) }}</td>
+            <td>
+              {% if registro.lectura_final_total is not none %}
+                {{ "%.3f"|format((registro.lectura_final_total or 0)|float) }}
+              {% else %}
+                Pendiente
+              {% endif %}
+            </td>
+            <td>{{ "%.3f"|format((registro.consumo_total_kwh or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td>Gravity</td>
+            <td>{{ "%.3f"|format((registro.lectura_inicial_gravity or 0)|float) }}</td>
+            <td>
+              {% if registro.lectura_final_gravity is not none %}
+                {{ "%.3f"|format((registro.lectura_final_gravity or 0)|float) }}
+              {% else %}
+                Pendiente
+              {% endif %}
+            </td>
+            <td>{{ "%.3f"|format((registro.consumo_gravity_kwh or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td>Zona Cero</td>
+            <td>{{ "%.3f"|format((registro.lectura_inicial_zona_cero or 0)|float) }}</td>
+            <td>
+              {% if registro.lectura_final_zona_cero is not none %}
+                {{ "%.3f"|format((registro.lectura_final_zona_cero or 0)|float) }}
+              {% else %}
+                Pendiente
+              {% endif %}
+            </td>
+            <td>{{ "%.3f"|format((registro.consumo_zona_cero_kwh or 0)|float) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================= RESUMEN DE CONSUMO ========================= -->
+  <div class="summary-grid">
+    <div class="summary-card total">
+      <span class="summary-label">Consumo total</span>
+      <strong>{{ "%.3f"|format((registro.consumo_total_kwh or 0)|float) }} kWh</strong>
+      <small>${{ "{:,.0f}".format((registro.costo_total or 0)|float) }}</small>
+    </div>
+
+    <div class="summary-card gravity">
+      <span class="summary-label">Gravity</span>
+      <strong>{{ "%.3f"|format((registro.consumo_gravity_kwh or 0)|float) }} kWh</strong>
+      <small>${{ "{:,.0f}".format((registro.costo_gravity or 0)|float) }}</small>
+    </div>
+
+    <div class="summary-card zona">
+      <span class="summary-label">Zona Cero</span>
+      <strong>{{ "%.3f"|format((registro.consumo_zona_cero_kwh or 0)|float) }} kWh</strong>
+      <small>${{ "{:,.0f}".format((registro.costo_zona_cero or 0)|float) }}</small>
+    </div>
+
+    <div class="summary-card restante">
+      <span class="summary-label">Restante</span>
+      <strong>{{ "%.3f"|format((registro.consumo_restante_kwh or 0)|float) }} kWh</strong>
+      <small>${{ "{:,.0f}".format((registro.costo_restante or 0)|float) }}</small>
+    </div>
+  </div>
+
+  <!-- ========================= DESGLOSE ========================= -->
+  <div class="card">
+    <h2>🧮 Desglose del cálculo</h2>
+
+    <div class="formula-box">
+      <strong>Regla:</strong>
+      Consumo restante = Consumo total - Consumo Gravity - Consumo Zona Cero
+    </div>
+
+    <div class="table-scroll">
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <th>kWh</th>
+            <th>Costo</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr>
+            <td>Total general</td>
+            <td>{{ "%.3f"|format((registro.consumo_total_kwh or 0)|float) }}</td>
+            <td>${{ "{:,.0f}".format((registro.costo_total or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td>Gravity</td>
+            <td>{{ "%.3f"|format((registro.consumo_gravity_kwh or 0)|float) }}</td>
+            <td>${{ "{:,.0f}".format((registro.costo_gravity or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td>Zona Cero</td>
+            <td>{{ "%.3f"|format((registro.consumo_zona_cero_kwh or 0)|float) }}</td>
+            <td>${{ "{:,.0f}".format((registro.costo_zona_cero or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td>Consumo identificado</td>
+            <td>{{ "%.3f"|format((registro.consumo_identificado_kwh or 0)|float) }}</td>
+            <td>${{ "{:,.0f}".format((registro.costo_identificado or 0)|float) }}</td>
+          </tr>
+
+          <tr>
+            <td><strong>Restante / no asignado</strong></td>
+            <td><strong>{{ "%.3f"|format((registro.consumo_restante_kwh or 0)|float) }}</strong></td>
+            <td><strong>${{ "{:,.0f}".format((registro.costo_restante or 0)|float) }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ========================= OBSERVACIONES ========================= -->
+  <div class="card">
+    <h2>📝 Observaciones</h2>
+
+    {% if registro.observaciones %}
+      <p class="observaciones">{{ registro.observaciones }}</p>
+    {% else %}
+      <p class="empty">Sin observaciones registradas.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+.dashboard-container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 20px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.page-title {
+  margin: 0;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.page-subtitle {
+  margin: 6px 0 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 20px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+  border: 1px solid #e3e6ea;
+}
+
+.card h2 {
+  margin-top: 0;
+  color: #2c3e50;
+}
+
+.btn-volver,
+.btn-secondary {
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+}
+
+.btn-volver {
+  background: #6c757d;
+  color: #fff;
+}
+
+.btn-secondary {
+  background: #eef2ff;
+  color: #3443a5;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.detail-header h2 {
+  margin-bottom: 4px;
+}
+
+.detail-header p {
+  margin: 0;
+  color: #495057;
+}
+
+.badge-estado {
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+  display: inline-flex;
+}
+
+.badge-estado.ABIERTO {
+  background: #ffc107;
+  color: #212529;
+}
+
+.badge-estado.CERRADO {
+  background: #28a745;
+}
+
+.badge-estado.ANULADO {
+  background: #dc3545;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.meta-item {
+  border: 1px solid #e3e6ea;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.meta-item span {
+  display: block;
+  color: #6c757d;
+  font-size: 0.82rem;
+  margin-bottom: 5px;
+}
+
+.meta-item strong {
+  color: #2c3e50;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.summary-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  border: 1px solid #e3e6ea;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+}
+
+.summary-card .summary-label {
+  display: block;
+  color: #6c757d;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.summary-card strong {
+  display: block;
+  font-size: 1.35rem;
+  color: #2c3e50;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 4px;
+  color: #495057;
+  font-weight: 700;
+}
+
+.summary-card.total {
+  border-left: 5px solid #007bff;
+}
+
+.summary-card.gravity {
+  border-left: 5px solid #28a745;
+}
+
+.summary-card.zona {
+  border-left: 5px solid #fd7e14;
+}
+
+.summary-card.restante {
+  border-left: 5px solid #6f42c1;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.styled-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.styled-table thead {
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  color: white;
+}
+
+.styled-table th,
+.styled-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e5e8ef;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.styled-table tbody tr:hover {
+  background-color: #f8faff;
+}
+
+.formula-box {
+  margin-top: 4px;
+  background: #f8f9fa;
+  border: 1px solid #e3e6ea;
+  color: #495057;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.observaciones {
+  background: #fbfcfe;
+  border: 1px solid #e3e6ea;
+  border-radius: 10px;
+  padding: 14px;
+  color: #495057;
+  line-height: 1.5;
+}
+
+.empty {
+  text-align: center;
+  color: #666;
+  padding: 14px;
+  font-style: italic;
+}
+
+@media (max-width: 992px) {
+  .summary-grid,
+  .meta-grid {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-container {
+    padding: 14px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .summary-grid,
+  .meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions a {
+    width: 100%;
+  }
+}
+</style>
+{% endblock %}

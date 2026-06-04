@@ -1,0 +1,584 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Factura{% endblock %}
+
+{% block content %}
+
+{# ======================================================
+   Normalización visual del cliente
+   Evita mostrar el JSON completo si factura.cliente viene como objeto
+====================================================== #}
+{% if factura.cliente is mapping %}
+  {% set cliente_nombre = factura.cliente.nombre_cliente
+      or factura.cliente.razonsocial
+      or ((factura.cliente.nombres or '') ~ ' ' ~ (factura.cliente.apellidos or ''))|trim
+      or 'No registrado'
+  %}
+  {% set cliente_identificacion = factura.cliente.identificacion or '—' %}
+  {% set cliente_id = factura.cliente.idcliente or factura.idcliente or '—' %}
+{% else %}
+  {% set cliente_nombre = factura.cliente or factura.nombre_cliente or factura.razonsocial or 'No registrado' %}
+  {% set cliente_identificacion = factura.identificacion or '—' %}
+  {% set cliente_id = factura.idcliente or '—' %}
+{% endif %}
+
+<div class="invoice-page">
+
+  <!-- Encabezado -->
+  <div class="invoice-header">
+
+    <div>
+      <a href="{{ url_for('facturas.listar_facturas') }}" class="back-link">
+        ← Volver a facturas
+      </a>
+
+      <h1>Factura #{{ factura.idfactura }}</h1>
+
+      <p>
+        Consulta el detalle general de la factura, su estado y la información enviada a Siigo.
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <span class="status-badge status-{{ (factura.estado or 'sin_estado')|lower|replace(' ', '-') }}">
+        {{ factura.estado or 'Sin estado' }}
+      </span>
+
+      {% if factura.public_url %}
+        <a href="{{ factura.public_url }}" target="_blank" class="btn-primary">
+          📄 Ver PDF
+        </a>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Resumen principal -->
+  <div class="summary-grid">
+
+    <div class="summary-card">
+      <span>Cliente</span>
+      <strong>{{ cliente_nombre }}</strong>
+
+      {% if cliente_identificacion and cliente_identificacion != '—' %}
+        <small>{{ cliente_identificacion }}</small>
+      {% endif %}
+    </div>
+
+    <div class="summary-card">
+      <span>Total factura</span>
+      <strong>
+        ${{ "{:,.0f}".format(factura.total|float).replace(",", ".") if factura.total else "0" }}
+      </strong>
+    </div>
+
+    <div class="summary-card">
+      <span>Estado</span>
+      <strong>{{ factura.estado or 'Sin estado' }}</strong>
+    </div>
+
+    <div class="summary-card">
+      <span>Siigo #</span>
+      <strong>{{ factura.siigo_number or 'No generado' }}</strong>
+    </div>
+
+  </div>
+
+  <!-- Información de la factura -->
+  <div class="content-grid">
+
+    <section class="info-card">
+      <div class="card-title">
+        <h2>Información general</h2>
+        <p>Datos principales del documento.</p>
+      </div>
+
+      <div class="info-list">
+
+        <div class="info-row">
+          <span>ID factura</span>
+          <strong>{{ factura.idfactura }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Cliente</span>
+          <strong>{{ cliente_nombre }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Identificación</span>
+          <strong>{{ cliente_identificacion }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>ID cliente</span>
+          <strong>{{ cliente_id }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Total</span>
+          <strong>
+            ${{ "{:,.0f}".format(factura.total|float).replace(",", ".") if factura.total else "0" }}
+          </strong>
+        </div>
+
+        <div class="info-row">
+          <span>Estado</span>
+          <strong>{{ factura.estado or '—' }}</strong>
+        </div>
+
+        {% if factura.createdat %}
+        <div class="info-row">
+          <span>Fecha creación</span>
+          <strong>{{ factura.createdat }}</strong>
+        </div>
+        {% endif %}
+
+        {% if factura.updatedat %}
+        <div class="info-row">
+          <span>Última actualización</span>
+          <strong>{{ factura.updatedat }}</strong>
+        </div>
+        {% endif %}
+
+      </div>
+    </section>
+
+    <section class="info-card">
+      <div class="card-title">
+        <h2>Información Siigo</h2>
+        <p>Datos de integración y trazabilidad.</p>
+      </div>
+
+      <div class="info-list">
+
+        <div class="info-row">
+          <span>Siigo ID</span>
+          <strong>{{ factura.siigo_id or '—' }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Número Siigo</span>
+          <strong>{{ factura.siigo_number or '—' }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Nombre Siigo</span>
+          <strong>{{ factura.siigo_name or '—' }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>CUFE</span>
+          <strong class="wrap-text">{{ factura.cufe or '—' }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>PDF Siigo</span>
+
+          {% if factura.public_url %}
+            <a href="{{ factura.public_url }}" target="_blank" class="inline-link">
+              Abrir documento
+            </a>
+          {% else %}
+            <strong>—</strong>
+          {% endif %}
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Observaciones -->
+  <section class="info-card observations-card">
+    <div class="card-title">
+      <h2>Observaciones</h2>
+      <p>Comentarios o información adicional asociada a la factura.</p>
+    </div>
+
+    <div class="observation-box">
+      {% if factura.observaciones %}
+        {{ factura.observaciones }}
+      {% elif factura.observacion %}
+        {{ factura.observacion }}
+      {% else %}
+        No se registraron observaciones para esta factura.
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Acciones inferiores -->
+  <div class="footer-actions">
+    <a href="{{ url_for('facturas.listar_facturas') }}" class="btn-secondary">
+      ← Volver
+    </a>
+
+    {% if factura.public_url %}
+      <a href="{{ factura.public_url }}" target="_blank" class="btn-primary">
+        📄 Ver PDF en Siigo
+      </a>
+    {% endif %}
+  </div>
+
+</div>
+
+<style>
+/* ==============================
+   DETALLE FACTURA
+============================== */
+
+.invoice-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 22px 46px;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111827;
+}
+
+.invoice-header {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.invoice-header h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.invoice-header p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 680px;
+  line-height: 1.5;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* ==============================
+   ESTADOS
+============================== */
+
+.status-badge {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-pagada,
+.status-facturada,
+.status-enviada,
+.status-aprobada {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-pendiente,
+.status-pendiente-siigo,
+.status-pendiente_envio {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-anulada,
+.status-cancelada,
+.status-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.status-borrador {
+  background: #e5e7eb;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+/* ==============================
+   BOTONES
+============================== */
+
+.btn-primary,
+.btn-secondary {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  border: 1px solid transparent;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.24);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+/* ==============================
+   RESUMEN
+============================== */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  min-height: 130px;
+}
+
+.summary-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 750;
+  margin-bottom: 10px;
+}
+
+.summary-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  font-weight: 900;
+  word-break: break-word;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* ==============================
+   CONTENIDO
+============================== */
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.info-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.card-title {
+  margin-bottom: 18px;
+}
+
+.card-title h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.card-title p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #edf2f7;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf2f7;
+  align-items: start;
+}
+
+.info-row span {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.info-row strong {
+  color: #111827;
+  font-size: 0.95rem;
+  font-weight: 850;
+}
+
+.wrap-text {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.inline-link {
+  color: #2563eb;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.inline-link:hover {
+  text-decoration: underline;
+}
+
+/* ==============================
+   OBSERVACIONES
+============================== */
+
+.observations-card {
+  margin-bottom: 20px;
+}
+
+.observation-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 16px;
+  color: #334155;
+  line-height: 1.55;
+  min-height: 72px;
+}
+
+/* ==============================
+   ACCIONES INFERIORES
+============================== */
+
+.footer-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 950px) {
+  .invoice-header {
+    flex-direction: column;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .invoice-page {
+    padding: 20px 14px 34px;
+  }
+
+  .invoice-header {
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .info-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+  }
+
+  .footer-actions {
+    flex-direction: column;
+  }
+}
+</style>
+
+{% endblock %}

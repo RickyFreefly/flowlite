@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+{# ======================================================
+   Control por rol FlowLite:
+   - ADMIN: ve todos los módulos disponibles
+   - Otros roles: acceso limitado
+====================================================== #}
+{% set userRol = (rol or '')|upper %}
+{% set isAdmin = (userRol == 'ADMIN') %}
+
+<div class="dashboard-page">
+
+  <!-- =========================
+       TOP BAR
+  ========================== -->
+  <header class="dashboard-topbar">
+    <div class="brand-block">
+      <img src="{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
+           alt="FlowLite"
+           class="brand-logo">
+
+      <div class="brand-text">
+        <h1>Bienvenido, <span>{{ username }}</span></h1>
+
+        <p>
+          {% if empresa_nombre %}
+            Empresa activa: <strong>{{ empresa_nombre }}</strong>
+          {% elif isAdmin %}
+            Panel principal de administración FlowLite
+          {% else %}
+            Acceso limitado
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="user-actions">
+      <span class="role-pill">
+        {{ userRol or 'SIN ROL' }}
+      </span>
+
+      <a href="{{ url_for('auth.logout') }}" class="btn-logout">
+        Cerrar sesión
+      </a>
+    </div>
+  </header>
+
+  <!-- =========================
+       PANEL PRINCIPAL
+  ========================== -->
+  <main class="dashboard-shell">
+
+    {% if isAdmin %}
+
+      <!-- =========================
+           SECCIÓN OPERACIÓN
+      ========================== -->
+      <section class="module-section">
+        <div class="section-header">
+          <div>
+            <h2>Operación</h2>
+            <p>Gestión diaria de clientes, reservas, productos, facturación y egresos.</p>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+          <a href="{{ url_for('clientes.listar_clientes') }}" class="module-card module-card-blue">
+            <div class="module-icon">👥</div>
+            <div class="module-content">
+              <h3>Clientes</h3>
+              <p>Consulta, creación y actualización de clientes por empresa.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('reservas.listar_reservas') }}" class="module-card module-card-cyan">
+            <div class="module-icon">📅</div>
+            <div class="module-content">
+              <h3>Reservas</h3>
+              <p>Control de reservas, horarios y disponibilidad.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('productos.listar_productos') }}" class="module-card module-card-products">
+            <div class="module-icon">📦</div>
+            <div class="module-content">
+              <h3>Productos</h3>
+              <p>Administra productos, servicios, paquetes, precios e impuestos.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('facturas.listar_facturas') }}" class="module-card module-card-green">
+            <div class="module-icon">🧾</div>
+            <div class="module-content">
+              <h3>Facturas</h3>
+              <p>Emisión, consulta y seguimiento de facturación.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('egresos.listar_egresos') }}" class="module-card module-card-red">
+            <div class="module-icon">💸</div>
+            <div class="module-content">
+              <h3>Egresos</h3>
+              <p>Registro de gastos, pagos y salidas de dinero.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('caja.listar_caja') }}" class="module-card module-card-purple">
+            <div class="module-icon">💰</div>
+            <div class="module-content">
+              <h3>Caja</h3>
+              <p>Registro y control de movimientos de caja.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+        </div>
+      </section>
+
+      <!-- =========================
+           SECCIÓN INFORMES Y CONTROL
+      ========================== -->
+      <section class="module-section">
+        <div class="section-header">
+          <div>
+            <h2>Informes y control</h2>
+            <p>Cierres, reportes financieros e indicadores básicos de gestión.</p>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+          <a href="{{ url_for('cierre.cierre_dia') }}" class="module-card module-card-teal">
+            <div class="module-icon">📆</div>
+            <div class="module-content">
+              <h3>Cierre Día</h3>
+              <p>Resumen financiero y operativo del día actual.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('informe.cierre_informe') }}" class="module-card module-card-indigo">
+            <div class="module-icon">📈</div>
+            <div class="module-content">
+              <h3>Informe por Fechas</h3>
+              <p>Ingresos, egresos y saldos por rango de fechas.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('calendar.calendar_view') }}" class="module-card module-card-orange">
+            <div class="module-icon">🗓️</div>
+            <div class="module-content">
+              <h3>Calendario</h3>
+              <p>Visualiza reservas y actividades programadas.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+        </div>
+      </section>
+
+      <!-- =========================
+           SECCIÓN ADMINISTRACIÓN
+      ========================== -->
+      <section class="module-section">
+        <div class="section-header">
+          <div>
+            <h2>Administración</h2>
+            <p>Gestión de usuarios y configuración operativa del sistema.</p>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+
+          <a href="{{ url_for('usuarios.listar_usuarios') }}" class="module-card module-card-dark">
+            <div class="module-icon">🔐</div>
+            <div class="module-content">
+              <h3>Usuarios</h3>
+              <p>Administra usuarios y accesos del sistema.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+        </div>
+      </section>
+
+    {% else %}
+
+      <!-- =========================
+           ACCESO LIMITADO
+      ========================== -->
+      <section class="module-section single-access">
+        <div class="section-header">
+          <div>
+            <h2>Acceso limitado</h2>
+            <p>No tienes módulos administrativos asignados para esta empresa.</p>
+          </div>
+        </div>
+
+        <div class="empty-access-card">
+          <div class="empty-icon">🔒</div>
+          <h3>Sin módulos disponibles</h3>
+          <p>
+            Solicita a un administrador que revise tu rol o tu vinculación con la empresa activa.
+          </p>
+        </div>
+      </section>
+
+    {% endif %}
+
+  </main>
+
+</div>
+
+<style>
+/* ==============================
+   DASHBOARD MODERNO
+============================== */
+
+.dashboard-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.10), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+  padding: 34px 24px 48px;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111827;
+}
+
+/* ==============================
+   TOP BAR
+============================== */
+
+.dashboard-topbar {
+  max-width: 1180px;
+  margin: 0 auto 34px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 26px;
+  padding: 24px 28px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.brand-logo {
+  width: 150px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.brand-text h1 {
+  margin: 0 0 6px;
+  color: #222;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  line-height: 1.05;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.brand-text h1 span {
+  color: #0b7cff;
+}
+
+.brand-text p {
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.brand-text p strong {
+  color: #0f172a;
+  font-weight: 850;
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.btn-logout {
+  min-height: 42px;
+  min-width: 132px;
+  padding: 0 20px;
+  border-radius: 999px;
+  text-decoration: none;
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  font-weight: 800;
+  font-size: 0.92rem;
+  line-height: 1;
+  transition: 0.2s ease;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn-logout:hover {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+/* ==============================
+   SHELL
+============================== */
+
+.dashboard-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.module-section {
+  margin-bottom: 34px;
+}
+
+.section-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  margin: 0 0 4px;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.section-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.96rem;
+}
+
+/* ==============================
+   GRID
+============================== */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* ==============================
+   CARDS
+============================== */
+
+.module-card {
+  position: relative;
+  min-height: 148px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  text-decoration: none;
+  color: #111827;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.module-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--card-color, #0ea5e9);
+}
+
+.module-card::after {
+  content: "";
+  position: absolute;
+  right: -32px;
+  bottom: -36px;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  background: var(--card-soft, rgba(14, 165, 233, 0.08));
+}
+
+.module-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.13);
+  border-color: var(--card-border, #bae6fd);
+}
+
+.module-icon {
+  width: 54px;
+  height: 54px;
+  min-width: 54px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-soft, #e0f2fe);
+  color: var(--card-color, #0284c7);
+  font-size: 1.7rem;
+  z-index: 1;
+}
+
+.module-content {
+  z-index: 1;
+  padding-right: 20px;
+}
+
+.module-content h3 {
+  margin: 2px 0 7px;
+  color: #111827;
+  font-size: 1.1rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+}
+
+.module-content p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.module-arrow {
+  position: absolute;
+  right: 18px;
+  top: 20px;
+  color: var(--card-color, #0284c7);
+  font-weight: 900;
+  font-size: 1.2rem;
+  opacity: 0.7;
+  z-index: 2;
+}
+
+/* ==============================
+   EMPTY ACCESS
+============================== */
+
+.single-access {
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.empty-access-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.empty-icon {
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  margin: 0 auto 14px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.7rem;
+}
+
+.empty-access-card h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
+.empty-access-card p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* ==============================
+   CARD COLORS
+============================== */
+
+.module-card-blue {
+  --card-color: #2563eb;
+  --card-soft: #dbeafe;
+  --card-border: #bfdbfe;
+}
+
+.module-card-cyan {
+  --card-color: #0891b2;
+  --card-soft: #cffafe;
+  --card-border: #a5f3fc;
+}
+
+.module-card-products {
+  --card-color: #9333ea;
+  --card-soft: #f3e8ff;
+  --card-border: #e9d5ff;
+}
+
+.module-card-green {
+  --card-color: #16a34a;
+  --card-soft: #dcfce7;
+  --card-border: #bbf7d0;
+}
+
+.module-card-red {
+  --card-color: #dc2626;
+  --card-soft: #fee2e2;
+  --card-border: #fecaca;
+}
+
+.module-card-purple {
+  --card-color: #7c3aed;
+  --card-soft: #ede9fe;
+  --card-border: #ddd6fe;
+}
+
+.module-card-teal {
+  --card-color: #0f766e;
+  --card-soft: #ccfbf1;
+  --card-border: #99f6e4;
+}
+
+.module-card-indigo {
+  --card-color: #4f46e5;
+  --card-soft: #e0e7ff;
+  --card-border: #c7d2fe;
+}
+
+.module-card-orange {
+  --card-color: #ea580c;
+  --card-soft: #ffedd5;
+  --card-border: #fed7aa;
+}
+
+.module-card-dark {
+  --card-color: #0f172a;
+  --card-soft: #e2e8f0;
+  --card-border: #cbd5e1;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 1000px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-topbar {
+    align-items: flex-start;
+  }
+
+  .brand-block {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-page {
+    padding: 22px 14px 38px;
+  }
+
+  .dashboard-topbar {
+    flex-direction: column;
+    border-radius: 22px;
+    padding: 22px;
+  }
+
+  .brand-block {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .brand-logo {
+    width: 130px;
+  }
+
+  .user-actions {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .role-pill {
+    min-height: 40px;
+  }
+
+  .btn-logout {
+    min-height: 40px;
+    min-width: 130px;
+    padding: 0 18px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .module-card {
+    min-height: 132px;
+  }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,848 @@
+{% extends "base.html" %}
+{% block title %}Cierre Diario{% endblock %}
+
+{% block content %}
+
+<div class="cierre-page">
+
+  {# ==============================
+     CÁLCULO DE INDICADORES
+  =============================== #}
+  {% set ingresos = namespace(valor=0) %}
+  {% set egresos = namespace(valor=0) %}
+  {% set otros = namespace(valor=0) %}
+
+  {% for t in totales %}
+    {% set tipo_normalizado = (t.tipo or '')|upper %}
+
+    {% if 'INGRESO' in tipo_normalizado or 'VENTA' in tipo_normalizado %}
+      {% set ingresos.valor = ingresos.valor + (t.total|float) %}
+    {% elif 'EGRESO' in tipo_normalizado or 'GASTO' in tipo_normalizado %}
+      {% set egresos.valor = egresos.valor + (t.total|float) %}
+    {% else %}
+      {% set otros.valor = otros.valor + (t.total|float) %}
+    {% endif %}
+  {% endfor %}
+
+  {% set saldo_neto = ingresos.valor - egresos.valor %}
+  {% set total_operacion = ingresos.valor + egresos.valor %}
+  {% set total_movimientos = detalle|length %}
+
+  {% if total_operacion > 0 %}
+    {% set porcentaje_ingresos = (ingresos.valor / total_operacion * 100) %}
+    {% set porcentaje_egresos = (egresos.valor / total_operacion * 100) %}
+  {% else %}
+    {% set porcentaje_ingresos = 0 %}
+    {% set porcentaje_egresos = 0 %}
+  {% endif %}
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="cierre-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Cierre Diario</h1>
+
+      <p>
+        Resumen financiero y operativo correspondiente al cierre del día
+        <strong>{{ fecha_cierre }}</strong>.
+      </p>
+    </div>
+
+    <div class="hero-date">
+      <span>Fecha de cierre</span>
+      <strong>{{ fecha_cierre }}</strong>
+    </div>
+  </section>
+
+  <!-- ==============================
+       INDICADORES PRINCIPALES
+  =============================== -->
+  <section class="kpi-grid">
+
+    <div class="kpi-card kpi-income">
+      <span>Ingresos</span>
+      <strong>${{ '{:,.0f}'.format(ingresos.valor).replace(',', '.') }}</strong>
+      <small>Total recibido en el día</small>
+    </div>
+
+    <div class="kpi-card kpi-expense">
+      <span>Egresos</span>
+      <strong>${{ '{:,.0f}'.format(egresos.valor).replace(',', '.') }}</strong>
+      <small>Salidas registradas</small>
+    </div>
+
+    <div class="kpi-card {% if saldo_neto >= 0 %}kpi-net-positive{% else %}kpi-net-negative{% endif %}">
+      <span>Saldo neto</span>
+      <strong>
+        {% if saldo_neto < 0 %}
+          -${{ '{:,.0f}'.format((saldo_neto * -1)).replace(',', '.') }}
+        {% else %}
+          ${{ '{:,.0f}'.format(saldo_neto).replace(',', '.') }}
+        {% endif %}
+      </strong>
+      <small>Ingresos menos egresos</small>
+    </div>
+
+    <div class="kpi-card kpi-count">
+      <span>Movimientos</span>
+      <strong>{{ total_movimientos }}</strong>
+      <small>Registros del día</small>
+    </div>
+
+  </section>
+
+  <!-- ==============================
+       GRÁFICA E INDICADOR
+  =============================== -->
+  <section class="analytics-grid">
+
+    <!-- Gráfica dona -->
+    <div class="chart-card">
+      <div class="section-heading">
+        <h2>Indicador del cierre</h2>
+        <p>Distribución entre ingresos y egresos registrados.</p>
+      </div>
+
+      <div class="chart-layout">
+        <div class="donut-chart"
+             style="--ingresos: {{ porcentaje_ingresos }}; --egresos: {{ porcentaje_egresos }};">
+          <div class="donut-center">
+            <span>Saldo</span>
+            <strong>
+              {% if saldo_neto < 0 %}
+                -${{ '{:,.0f}'.format((saldo_neto * -1)).replace(',', '.') }}
+              {% else %}
+                ${{ '{:,.0f}'.format(saldo_neto).replace(',', '.') }}
+              {% endif %}
+            </strong>
+          </div>
+        </div>
+
+        <div class="chart-legend">
+          <div class="legend-item">
+            <span class="legend-dot income"></span>
+            <div>
+              <strong>Ingresos</strong>
+              <small>{{ '{:,.1f}'.format(porcentaje_ingresos).replace(',', '.') }}%</small>
+            </div>
+          </div>
+
+          <div class="legend-item">
+            <span class="legend-dot expense"></span>
+            <div>
+              <strong>Egresos</strong>
+              <small>{{ '{:,.1f}'.format(porcentaje_egresos).replace(',', '.') }}%</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra de composición -->
+    <div class="chart-card">
+      <div class="section-heading">
+        <h2>Composición del día</h2>
+        <p>Relación visual entre entradas y salidas.</p>
+      </div>
+
+      <div class="balance-meter">
+        <div class="meter-labels">
+          <span>Ingresos</span>
+          <span>Egresos</span>
+        </div>
+
+        <div class="meter-bar">
+          <div class="meter-income" style="width: {{ porcentaje_ingresos }}%;"></div>
+          <div class="meter-expense" style="width: {{ porcentaje_egresos }}%;"></div>
+        </div>
+
+        <div class="meter-values">
+          <strong>${{ '{:,.0f}'.format(ingresos.valor).replace(',', '.') }}</strong>
+          <strong>${{ '{:,.0f}'.format(egresos.valor).replace(',', '.') }}</strong>
+        </div>
+      </div>
+
+      <div class="closing-status {% if saldo_neto >= 0 %}positive{% else %}negative{% endif %}">
+        {% if saldo_neto >= 0 %}
+          <strong>Cierre positivo</strong>
+          <span>Los ingresos superan los egresos del día.</span>
+        {% else %}
+          <strong>Cierre negativo</strong>
+          <span>Los egresos superan los ingresos del día.</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==============================
+       TOTALES DETALLADOS
+  =============================== -->
+  <section class="summary-card">
+    <div class="section-heading">
+      <h2>Totales del día</h2>
+      <p>Detalle consolidado por tipo de movimiento.</p>
+    </div>
+
+    <div class="summary-grid">
+      {% for t in totales %}
+      <div class="summary-item {{ t.tipo | lower | replace(' ', '-') }}">
+        <span>{{ t.tipo }}</span>
+        <strong>
+          {{ t.signo }}${{ '{:,.0f}'.format(t.total|float).replace(',', '.') }}
+        </strong>
+      </div>
+      {% else %}
+      <div class="empty-box">
+        No hay totales disponibles para este cierre.
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ==============================
+       DETALLE DE MOVIMIENTOS
+  =============================== -->
+  <section class="detail-card">
+    <div class="section-heading">
+      <h2>Detalle de movimientos</h2>
+      <p>Ingresos y egresos registrados para la fecha de cierre.</p>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="cierre-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Cliente / Proveedor</th>
+            <th>Producto / Concepto</th>
+            <th>Medio de pago</th>
+            <th>Estado</th>
+            <th>Fecha</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for m in detalle %}
+          <tr class="{{ 'row-expense' if m.tipo == 'EGRESO' else 'row-income' }}">
+            <td data-label="Tipo">
+              <span class="type-badge {{ 'expense' if m.tipo == 'EGRESO' else 'income' }}">
+                {{ m.tipo }}
+              </span>
+            </td>
+
+            <td data-label="Cliente / Proveedor">
+              <strong>{{ m.cliente or '—' }}</strong>
+            </td>
+
+            <td data-label="Producto / Concepto">
+              {{ m.producto if m.producto else '-' }}
+            </td>
+
+            <td data-label="Medio de pago">
+              <span class="payment-pill">
+                {{ m.medio_pago if m.medio_pago else 'N/A' }}
+              </span>
+            </td>
+
+            <td data-label="Estado">
+              <span class="status-pill">
+                {{ m.estado or '—' }}
+              </span>
+            </td>
+
+            <td data-label="Fecha">
+              {{ m.fecha }}
+            </td>
+
+            <td data-label="Valor" class="text-right">
+              <strong class="{{ 'money-expense' if m.tipo == 'EGRESO' else 'money-income' }}">
+                ${{ '{:,.0f}'.format(m.valor|float).replace(',', '.') }}
+              </strong>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="empty-state">
+              <div class="empty-box">
+                <strong>No hay movimientos registrados hoy</strong>
+                <p>Cuando se registren ingresos o egresos, aparecerán en este detalle.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<style>
+.cierre-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   HERO
+============================== */
+.cierre-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.cierre-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.cierre-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 760px;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-date {
+  min-width: 190px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.hero-date span {
+  display: block;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.hero-date strong {
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+/* ==============================
+   KPI
+============================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.kpi-card {
+  border-radius: 20px;
+  padding: 20px;
+  color: #fff;
+  min-height: 132px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.kpi-card span {
+  font-size: 0.9rem;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+.kpi-card strong {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.kpi-card small {
+  font-size: 0.82rem;
+  opacity: 0.86;
+}
+
+.kpi-income {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.kpi-expense {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+}
+
+.kpi-net-positive {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.kpi-net-negative {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+}
+
+.kpi-count {
+  background: linear-gradient(135deg, #4f46e5, #3730a3);
+}
+
+/* ==============================
+   ANALYTICS
+============================== */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.chart-card,
+.summary-card,
+.detail-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.section-heading h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.chart-layout {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.donut-chart {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      #16a34a 0 calc(var(--ingresos) * 1%),
+      #dc2626 calc(var(--ingresos) * 1%) 100%
+    );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.donut-chart::after {
+  content: "";
+  position: absolute;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.donut-center {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.donut-center span {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.donut-center strong {
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.legend-dot.income {
+  background: #16a34a;
+}
+
+.legend-dot.expense {
+  background: #dc2626;
+}
+
+.legend-item strong {
+  display: block;
+  color: #111827;
+  font-weight: 900;
+}
+
+.legend-item small {
+  color: #64748b;
+  font-weight: 750;
+}
+
+.balance-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meter-labels,
+.meter-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.meter-values strong:first-child {
+  color: #15803d;
+}
+
+.meter-values strong:last-child {
+  color: #991b1b;
+}
+
+.meter-bar {
+  width: 100%;
+  height: 18px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.meter-income {
+  background: #16a34a;
+}
+
+.meter-expense {
+  background: #dc2626;
+}
+
+.closing-status {
+  margin-top: 22px;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.closing-status strong {
+  display: block;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.closing-status span {
+  font-size: 0.9rem;
+}
+
+.closing-status.positive {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.closing-status.negative {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+/* ==============================
+   SUMMARY
+============================== */
+.summary-card {
+  margin-bottom: 22px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.summary-item {
+  border-radius: 18px;
+  padding: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.summary-item span {
+  display: block;
+  color: #64748b;
+  font-size: 0.88rem;
+  font-weight: 850;
+  margin-bottom: 8px;
+}
+
+.summary-item strong {
+  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+/* ==============================
+   TABLE
+============================== */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cierre-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1080px;
+}
+
+.cierre-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.cierre-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.cierre-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.cierre-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.cierre-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.cierre-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.type-badge,
+.payment-pill,
+.status-pill {
+  display: inline-flex;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.type-badge.income {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.type-badge.expense {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.payment-pill {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.status-pill {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.money-income {
+  color: #15803d;
+}
+
+.money-expense {
+  color: #991b1b;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box {
+  color: #64748b;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  margin-bottom: 5px;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+@media (max-width: 1080px) {
+  .kpi-grid,
+  .analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .chart-legend {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .cierre-page {
+    padding: 22px 14px 38px;
+  }
+
+  .cierre-hero,
+  .chart-card,
+  .summary-card,
+  .detail-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .cierre-hero {
+    flex-direction: column;
+  }
+
+  .kpi-grid,
+  .analytics-grid,
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cierre-table {
+    min-width: 0;
+  }
+
+  .cierre-table thead {
+    display: none;
+  }
+
+  .cierre-table,
+  .cierre-table tbody,
+  .cierre-table tr,
+  .cierre-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .cierre-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .cierre-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .cierre-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .cierre-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+}
+</style>
+
+{% endblock %}

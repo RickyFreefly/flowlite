@@ -1,0 +1,1117 @@
+{% extends "base.html" %}
+
+{% block title %}Egresos{% endblock %}
+
+{% block content %}
+
+<div class="egresos-page">
+
+  <!-- =========================
+       ENCABEZADO
+  ========================== -->
+  <section class="egresos-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Gestión de Egresos</h1>
+      <p>
+        Registra gastos, consulta pagos por proveedor y exporta egresos por rango de fechas de la empresa activa.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-badge">
+      {{ empresa_nombre or 'Egresos' }}
+    </div>
+  </section>
+
+  <!-- =========================
+       CREAR EGRESO
+  ========================== -->
+  <section class="form-card">
+    <div class="section-heading">
+      <div>
+        <h2>Crear egreso</h2>
+        <p>Registra una salida de dinero asociada a un concepto, proveedor y método de pago.</p>
+      </div>
+    </div>
+
+    <form method="post"
+          action="{{ url_for('egresos.crear_egreso') }}"
+          class="egreso-form"
+          id="egresoForm">
+
+      <div class="form-grid two-cols">
+
+        <div class="field">
+          <label for="fecha_mostrar">Fecha</label>
+          <input type="date"
+                 id="fecha_mostrar"
+                 name="fecha_mostrar"
+                 value="{{ fecha_actual }}"
+                 readonly>
+          <small class="field-help">La fecha se toma automáticamente del día actual.</small>
+        </div>
+
+        <div class="field">
+          <label for="concepto">Concepto</label>
+          <input type="text"
+                 id="concepto"
+                 name="concepto"
+                 placeholder="Ej: Compra de insumos"
+                 autocomplete="off"
+                 required>
+        </div>
+
+        <div class="field">
+          <label for="proveedor">Proveedor</label>
+          <input type="text"
+                 id="proveedor"
+                 name="proveedor"
+                 placeholder="Ej: Papelería Central"
+                 autocomplete="off"
+                 required>
+        </div>
+
+        <div class="field">
+          <label for="valor">Valor</label>
+          <div class="money-input">
+            <span>$</span>
+            <input type="text"
+                   name="valor"
+                   id="valor"
+                   placeholder="0"
+                   required
+                   inputmode="numeric"
+                   autocomplete="off">
+          </div>
+          <small class="field-help">Ingresa solo números. El sistema formatea el valor visualmente.</small>
+        </div>
+
+        <div class="field">
+          <label for="metodopago">Método de pago</label>
+          <select name="metodopago" id="metodopago" required>
+            <option value="">Selecciona método</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Transferencia bancaria">Transferencia bancaria</option>
+            <option value="Tarjeta débito">Tarjeta débito</option>
+            <option value="Tarjeta crédito">Tarjeta crédito</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="observacion">Observación</label>
+          <input type="text"
+                 id="observacion"
+                 name="observacion"
+                 placeholder="Nota opcional"
+                 autocomplete="off">
+        </div>
+
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="btnGuardarEgreso">
+          💾 Agregar egreso
+        </button>
+
+        <button type="button" class="btn btn-light" onclick="limpiarFormularioEgreso()">
+          Limpiar
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- =========================
+       FILTROS Y EXPORTACIÓN
+  ========================== -->
+  <section class="tools-grid">
+
+    <!-- Buscar -->
+    <div class="tool-card">
+      <div class="section-heading compact">
+        <div>
+          <h2>Buscar egresos</h2>
+          <p>Filtra el listado por proveedor y rango de fechas.</p>
+        </div>
+      </div>
+
+      <form method="get"
+            action="{{ url_for('egresos.listar_egresos') }}"
+            class="search-form">
+
+        <div class="form-grid two-cols">
+
+          <div class="field">
+            <label for="buscarProveedor">Proveedor</label>
+            <input type="text"
+                   id="buscarProveedor"
+                   name="proveedor"
+                   placeholder="Ej: Papelería"
+                   value="{{ proveedor_busqueda or '' }}">
+          </div>
+
+          <div class="field">
+            <label for="fecha_inicio_busqueda">Desde</label>
+            <input type="date"
+                   id="fecha_inicio_busqueda"
+                   name="fecha_inicio"
+                   value="{{ fecha_inicio or request.args.get('fecha_inicio','') }}">
+          </div>
+
+          <div class="field">
+            <label for="fecha_fin_busqueda">Hasta</label>
+            <input type="date"
+                   id="fecha_fin_busqueda"
+                   name="fecha_fin"
+                   value="{{ fecha_fin or request.args.get('fecha_fin','') }}">
+          </div>
+
+        </div>
+
+        <div class="tool-actions">
+          <button type="submit" class="btn btn-primary">
+            🔎 Buscar
+          </button>
+
+          <a href="{{ url_for('egresos.listar_egresos') }}" class="btn btn-light">
+            Limpiar
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Exportar -->
+    <div class="tool-card">
+      <div class="section-heading compact">
+        <div>
+          <h2>Exportar CSV</h2>
+          <p>Descarga egresos por rango de fechas.</p>
+        </div>
+      </div>
+
+      <form method="get"
+            action="{{ url_for('egresos.exportar_egresos_csv') }}"
+            class="export-form">
+
+        <div class="form-grid two-cols">
+          <div class="field">
+            <label for="fecha_inicio">Desde</label>
+            <input type="date"
+                   id="fecha_inicio"
+                   name="fecha_inicio"
+                   value="{{ fecha_inicio or request.args.get('fecha_inicio','') }}"
+                   required>
+          </div>
+
+          <div class="field">
+            <label for="fecha_fin">Hasta</label>
+            <input type="date"
+                   id="fecha_fin"
+                   name="fecha_fin"
+                   value="{{ fecha_fin or request.args.get('fecha_fin','') }}"
+                   required>
+          </div>
+        </div>
+
+        <div class="tool-actions">
+          <button type="submit" class="btn btn-secondary">
+            ⬇️ Descargar CSV
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </section>
+
+  <!-- =========================
+       LISTADO
+  ========================== -->
+  <section class="list-card">
+    <div class="list-header">
+      <div>
+        <h2>Listado de egresos</h2>
+        <p>
+          {% if egresos %}
+            Mostrando {{ egresos|length }} egreso(s).
+          {% else %}
+            No hay egresos registrados.
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="active-filters">
+        {% if proveedor_busqueda %}
+          <span class="filter-pill">
+            Proveedor: {{ proveedor_busqueda }}
+          </span>
+        {% endif %}
+
+        {% if fecha_inicio or fecha_fin or request.args.get('fecha_inicio') or request.args.get('fecha_fin') %}
+          <span class="filter-pill">
+            {{ fecha_inicio or request.args.get('fecha_inicio','Inicio') }} → {{ fecha_fin or request.args.get('fecha_fin','Fin') }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="egresos-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th>Proveedor</th>
+            <th>Valor</th>
+            <th>Método pago</th>
+            <th>Usuario</th>
+            <th>Observación</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for e in egresos %}
+          <tr>
+            <td data-label="ID">
+              <span class="egreso-id">#{{ e.idegreso }}</span>
+            </td>
+
+            <td data-label="Fecha">
+              {{ e.fecha[:10] if e.fecha else '-' }}
+            </td>
+
+            <td data-label="Concepto">
+              <a href="{{ url_for('egresos.detalle_egreso', id=e.idegreso) }}"
+                 class="concept-link">
+                {{ e.concepto or '-' }}
+              </a>
+            </td>
+
+            <td data-label="Proveedor">
+              <strong>{{ e.proveedor or '-' }}</strong>
+            </td>
+
+            <td data-label="Valor">
+              <strong class="money-value">
+                ${{ "{:,.0f}".format((e.valor or 0)|float).replace(",", ".") }}
+              </strong>
+            </td>
+
+            <td data-label="Método pago">
+              <span class="payment-pill">
+                {{ e.metodopago or '-' }}
+              </span>
+            </td>
+
+            <td data-label="Usuario">
+              {{ e.usuario or "—" }}
+            </td>
+
+            <td data-label="Observación">
+              <span class="observation-cell">
+                {{ e.observacion or "—" }}
+              </span>
+            </td>
+
+            <td data-label="Estado">
+              {% if e.observacion and 'ANULADO' in e.observacion %}
+                <span class="status-badge status-cancelled">Anulado</span>
+              {% elif e.observacion and 'PENDIENTE' in e.observacion %}
+                <span class="status-badge status-pending">Pendiente</span>
+              {% else %}
+                <span class="status-badge status-paid">Pagado</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="9" class="empty-state">
+              <div class="empty-box">
+                <strong>No hay egresos registrados</strong>
+                <p>Registra un egreso desde el formulario superior para empezar.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- =========================
+         PAGINACIÓN
+    ========================== -->
+    {% if total_pages and total_pages > 1 %}
+    <div class="pagination">
+
+      {% if page > 1 %}
+        <a href="{{ url_for('egresos.listar_egresos',
+                            page=page-1,
+                            proveedor=proveedor_busqueda,
+                            fecha_inicio=fecha_inicio or request.args.get('fecha_inicio',''),
+                            fecha_fin=fecha_fin or request.args.get('fecha_fin','')) }}"
+           class="page-btn">
+          ← Anterior
+        </a>
+      {% else %}
+        <span class="page-btn disabled">
+          ← Anterior
+        </span>
+      {% endif %}
+
+      <span class="page-info">
+        Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      </span>
+
+      {% if page < total_pages %}
+        <a href="{{ url_for('egresos.listar_egresos',
+                            page=page+1,
+                            proveedor=proveedor_busqueda,
+                            fecha_inicio=fecha_inicio or request.args.get('fecha_inicio',''),
+                            fecha_fin=fecha_fin or request.args.get('fecha_fin','')) }}"
+           class="page-btn">
+          Siguiente →
+        </a>
+      {% else %}
+        <span class="page-btn disabled">
+          Siguiente →
+        </span>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
+  </section>
+
+</div>
+
+<!-- =========================
+     SCRIPT
+========================== -->
+<script>
+const inputValor = document.getElementById("valor");
+
+if (inputValor) {
+  inputValor.addEventListener("input", function () {
+    let value = this.value.replace(/\D/g, "");
+
+    if (!value) {
+      this.value = "";
+      return;
+    }
+
+    this.value = new Intl.NumberFormat("es-CO").format(value);
+  });
+}
+
+function limpiarFormularioEgreso() {
+  const form = document.getElementById("egresoForm");
+
+  if (!form) return;
+
+  const fecha = document.getElementById("fecha_mostrar").value;
+
+  form.reset();
+
+  document.getElementById("fecha_mostrar").value = fecha;
+  form.dataset.submitted = "false";
+
+  const btn = document.getElementById("btnGuardarEgreso");
+  if (btn) {
+    btn.innerHTML = btn.dataset.originalText || "💾 Agregar egreso";
+    btn.disabled = false;
+    btn.classList.remove("btn-loading");
+  }
+}
+
+function limpiarTextoInput(id) {
+  const input = document.getElementById(id);
+  if (!input) return "";
+  input.value = input.value.trim();
+  return input.value;
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("egresoForm");
+
+  if (!form) return;
+
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      return false;
+    }
+
+    const concepto = limpiarTextoInput("concepto");
+    const proveedor = limpiarTextoInput("proveedor");
+    const metodopago = document.getElementById("metodopago").value;
+    const rawValor = inputValor ? inputValor.value.replace(/\./g, "").replace(/,/g, "") : "";
+
+    if (!concepto) {
+      event.preventDefault();
+      alert("El concepto es obligatorio.");
+      return false;
+    }
+
+    if (!proveedor) {
+      event.preventDefault();
+      alert("El proveedor es obligatorio.");
+      return false;
+    }
+
+    if (!rawValor || Number(rawValor) <= 0) {
+      event.preventDefault();
+      alert("El valor debe ser mayor a cero.");
+      return false;
+    }
+
+    if (!metodopago) {
+      event.preventDefault();
+      alert("Debes seleccionar un método de pago.");
+      return false;
+    }
+
+    if (inputValor) {
+      inputValor.value = rawValor;
+    }
+
+    form.dataset.submitted = "true";
+
+    const btn = document.getElementById("btnGuardarEgreso");
+    if (btn) {
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = "⏳ Guardando...";
+      btn.disabled = true;
+      btn.classList.add("btn-loading");
+    }
+
+    return true;
+  });
+});
+</script>
+
+<!-- =========================
+     ESTILOS
+========================== -->
+<style>
+.egresos-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* =========================
+   HERO
+========================= */
+.egresos-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.egresos-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.egresos-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-badge {
+  min-height: 38px;
+  max-width: 280px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================
+   CARDS
+========================= */
+.form-card,
+.tool-card,
+.list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.section-heading,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.section-heading.compact {
+  margin-bottom: 14px;
+}
+
+.section-heading h2,
+.list-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p,
+.list-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* =========================
+   FORM
+========================= */
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.two-cols {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field input:focus,
+.field select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.field input[readonly] {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.money-input {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  background: #f8fafc;
+  overflow: hidden;
+  transition: 0.2s ease;
+}
+
+.money-input:focus-within {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.money-input span {
+  min-width: 42px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-weight: 900;
+  border-right: 1px solid #d1d5db;
+}
+
+.money-input input {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.money-input input:focus {
+  box-shadow: none;
+}
+
+.form-actions,
+.tool-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-form,
+.export-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.btn,
+.page-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #0f172a;
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background: #1e293b;
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================
+   TABLE
+========================= */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.egresos-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1120px;
+}
+
+.egresos-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.egresos-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.egresos-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.egresos-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.egresos-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.egresos-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.egreso-id {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 900;
+}
+
+.concept-link {
+  color: #2563eb;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.concept-link:hover {
+  text-decoration: underline;
+}
+
+.money-value {
+  color: #991b1b;
+  font-weight: 900;
+}
+
+.payment-pill {
+  display: inline-flex;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.observation-cell {
+  display: inline-block;
+  max-width: 260px;
+  color: #475569;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.status-badge {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-paid {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.filter-pill {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+/* =========================
+   EMPTY
+========================= */
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* =========================
+   PAGINATION
+========================= */
+.pagination {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-info {
+  color: #64748b;
+  font-weight: 750;
+}
+
+.page-btn {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.page-btn:hover {
+  background: #e5e7eb;
+}
+
+.page-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 980px) {
+  .egresos-hero,
+  .list-header {
+    flex-direction: column;
+  }
+
+  .active-filters {
+    justify-content: flex-start;
+  }
+
+  .tools-grid,
+  .two-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .egresos-page {
+    padding: 22px 14px 38px;
+  }
+
+  .egresos-hero,
+  .form-card,
+  .tool-card,
+  .list-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .hero-badge {
+    max-width: 100%;
+  }
+
+  .form-actions,
+  .tool-actions {
+    flex-direction: column;
+  }
+
+  .btn,
+  .page-btn {
+    width: 100%;
+  }
+
+  .egresos-table {
+    min-width: 0;
+  }
+
+  .egresos-table thead {
+    display: none;
+  }
+
+  .egresos-table,
+  .egresos-table tbody,
+  .egresos-table tr,
+  .egresos-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .egresos-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .egresos-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .egresos-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .egresos-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .observation-cell {
+    max-width: 180px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>
+
+{% endblock %}

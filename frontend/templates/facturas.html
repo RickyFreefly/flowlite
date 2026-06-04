@@ -1,0 +1,1172 @@
+{% extends "base.html" %}
+
+{% block title %}Facturas{% endblock %}
+
+{% block content %}
+
+<div class="facturas-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="facturas-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Gestión de Facturas</h1>
+      <p>
+        Consulta, filtra, revisa, imprime tirillas y envía facturas o prefacturas de la empresa activa.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-actions">
+      <a href="{{ url_for('facturas.crear_factura_form') }}" class="btn btn-primary">
+        ➕ Nueva Factura
+      </a>
+    </div>
+  </section>
+
+  <!-- ==============================
+       FILTROS
+  =============================== -->
+  <section class="filter-card">
+    <div class="filter-header">
+      <div>
+        <h2>Filtros de búsqueda</h2>
+        <p>Busca facturas por cliente, estado del documento o cantidad de registros por página.</p>
+      </div>
+    </div>
+
+    <form method="get"
+          action="{{ url_for('facturas.listar_facturas') }}"
+          class="filter-form">
+
+      <input type="hidden" name="page" value="1">
+
+      <div class="field">
+        <label for="cliente">Cliente</label>
+        <input
+          id="cliente"
+          type="text"
+          name="cliente"
+          placeholder="Buscar por nombre o identificación"
+          value="{{ cliente or request.args.get('cliente','') }}"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="field">
+        <label for="estado">Estado</label>
+        {% set estado_actual = estado or request.args.get('estado','') %}
+        <select id="estado" name="estado">
+          <option value="">Todos los estados</option>
+
+          <option value="PREFACTURA" {% if estado_actual == 'PREFACTURA' %}selected{% endif %}>
+            Prefactura
+          </option>
+
+          <option value="PENDIENTE" {% if estado_actual == 'PENDIENTE' %}selected{% endif %}>
+            Pendiente
+          </option>
+
+          <option value="PENDIENTE_ENVIO" {% if estado_actual == 'PENDIENTE_ENVIO' %}selected{% endif %}>
+            Pendiente envío
+          </option>
+
+          <option value="ENVIADA" {% if estado_actual == 'ENVIADA' %}selected{% endif %}>
+            Enviada
+          </option>
+
+          <option value="PAGADO" {% if estado_actual == 'PAGADO' %}selected{% endif %}>
+            Pagado
+          </option>
+
+          <option value="CANCELADO" {% if estado_actual == 'CANCELADO' %}selected{% endif %}>
+            Cancelado
+          </option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="per_page">Mostrar</label>
+        {% set per_page_actual = per_page or request.args.get('per_page', 10)|int %}
+        <select id="per_page" name="per_page">
+          <option value="10" {% if per_page_actual == 10 %}selected{% endif %}>10</option>
+          <option value="25" {% if per_page_actual == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if per_page_actual == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per_page_actual == 100 %}selected{% endif %}>100</option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button
+          type="submit"
+          class="btn btn-primary"
+          data-loading-text="🔎 Buscando..."
+        >
+          🔍 Buscar
+        </button>
+
+        <a href="{{ url_for('facturas.listar_facturas') }}" class="btn btn-light">
+          Limpiar
+        </a>
+      </div>
+
+    </form>
+  </section>
+
+  <!-- ==============================
+       LISTADO
+  =============================== -->
+  <section class="list-card">
+
+    <div class="list-header">
+      <div>
+        <h2>Listado de facturas</h2>
+        <p>
+          Página {{ page }} de {{ total_pages }}.
+          {% if total is defined %}
+            Total filtrado: {{ total }} registro(s).
+          {% elif facturas %}
+            Mostrando {{ facturas|length }} registro(s).
+          {% else %}
+            No hay registros para mostrar.
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="active-filters">
+        {% if cliente or request.args.get('cliente') %}
+          <span class="filter-pill">
+            Cliente: {{ cliente or request.args.get('cliente') }}
+          </span>
+        {% endif %}
+
+        {% if estado_actual %}
+          <span class="filter-pill">
+            Estado: {{ estado_actual }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ==============================
+         TABLA
+    =============================== -->
+    <div class="table-wrapper">
+      <table class="facturas-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th>Siigo</th>
+            <th>Fecha</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for f in facturas %}
+          {% set estado_factura = f.estado or 'SIN_ESTADO' %}
+          {% set estado_class = estado_factura|lower|replace(' ', '-')|replace('_', '-') %}
+
+          <tr>
+            <td data-label="ID">
+              <span class="invoice-id">#{{ f.idfactura }}</span>
+            </td>
+
+            <td data-label="Cliente">
+              <div class="client-cell">
+                <strong>{{ f.nombre_cliente or 'Cliente sin nombre' }}</strong>
+                {% if f.identificacion %}
+                  <small>{{ f.identificacion }}</small>
+                {% endif %}
+              </div>
+            </td>
+
+            <td data-label="Total">
+              <strong class="money">
+                ${{ "{:,.0f}".format(f.total|float).replace(",", ".") if f.total else "0" }}
+              </strong>
+            </td>
+
+            <td data-label="Estado">
+              <span class="status-badge status-{{ estado_class }}">
+                {{ estado_factura }}
+              </span>
+            </td>
+
+            <td data-label="Siigo">
+              {% if f.siigo_number %}
+                <span class="siigo-number">{{ f.siigo_number }}</span>
+              {% else %}
+                <span class="muted">No generado</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Fecha">
+              {% if f.createdat %}
+                {{ f.createdat[:10] }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Acciones">
+              <div class="actions-cell">
+
+                {% if f.estado == "PREFACTURA" %}
+
+                  <a
+                    href="{{ url_for('facturas.facturas_editar_prefactura', id=f.idfactura) }}"
+                    class="action-btn action-edit"
+                  >
+                    ✏️ Editar
+                  </a>
+
+                  <form
+                    method="post"
+                    action="{{ url_for('facturas.enviar_prefactura', id=f.idfactura) }}"
+                    class="inline-form form-bloqueable form-envio-prefactura"
+                  >
+                    <button
+                      type="button"
+                      class="action-btn action-send btn-submit-factura"
+                      data-loading-text="⏳ Enviando..."
+                    >
+                      🚀 Enviar
+                    </button>
+                  </form>
+
+                  <a
+                    href="{{ url_for('facturas.imprimir_tirilla_factura', id=f.idfactura) }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="action-btn action-print"
+                    title="Imprimir tirilla de pago"
+                  >
+                    🧾 Tirilla
+                  </a>
+
+                {% else %}
+
+                  <a
+                    href="{{ url_for('facturas.detalle_factura', id=f.idfactura) }}"
+                    class="action-btn action-view"
+                  >
+                    🔍 Ver
+                  </a>
+
+                  <a
+                    href="{{ url_for('facturas.imprimir_tirilla_factura', id=f.idfactura) }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="action-btn action-print"
+                    title="Imprimir tirilla de pago"
+                  >
+                    🧾 Tirilla
+                  </a>
+
+                {% endif %}
+
+                {% if f.public_url %}
+                  <a
+                    href="{{ f.public_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="action-btn action-pdf"
+                    title="Ver documento"
+                  >
+                    📄 PDF
+                  </a>
+                {% endif %}
+
+              </div>
+            </td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="7" class="empty-state">
+              <div class="empty-box">
+                <strong>No se encontraron facturas</strong>
+                <p>Prueba limpiando los filtros o creando una nueva factura.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==============================
+         PAGINACIÓN
+    =============================== -->
+    {% if total_pages and total_pages > 1 %}
+    <div class="pagination">
+
+      <div class="pagination-info">
+        Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      </div>
+
+      <div class="pagination-actions">
+
+        {% if page > 1 %}
+          <a
+            href="{{ url_for(
+              'facturas.listar_facturas',
+              page=page-1,
+              per_page=per_page_actual,
+              cliente=cliente or request.args.get('cliente',''),
+              estado=estado_actual
+            ) }}"
+            class="page-btn"
+          >
+            ← Anterior
+          </a>
+        {% else %}
+          <span class="page-btn disabled">← Anterior</span>
+        {% endif %}
+
+        {% if page < total_pages %}
+          <a
+            href="{{ url_for(
+              'facturas.listar_facturas',
+              page=page+1,
+              per_page=per_page_actual,
+              cliente=cliente or request.args.get('cliente',''),
+              estado=estado_actual
+            ) }}"
+            class="page-btn"
+          >
+            Siguiente →
+          </a>
+        {% else %}
+          <span class="page-btn disabled">Siguiente →</span>
+        {% endif %}
+
+      </div>
+
+    </div>
+    {% endif %}
+
+  </section>
+
+</div>
+
+<!-- ✅ Control robusto de Enter + bloqueo contra doble clic / doble envío -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /*
+    BLOQUEO GLOBAL DE ENTER
+    Evita que Enter dispare:
+    - envío del formulario de filtros
+    - envío accidental de prefacturas
+    - activación de botones enfocados
+  */
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+
+  /*
+    BLOQUEO DE SUBMIT DIRECTO
+    Si el navegador intenta enviar un formulario por Enter,
+    queda bloqueado.
+  */
+  const forms = document.querySelectorAll("form");
+
+  forms.forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+
+      if (form.dataset.allowSubmit !== "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      form.dataset.submitted = "true";
+
+      bloquearBotonesFormulario(form);
+
+      return true;
+    });
+  });
+
+
+  /*
+    FORMULARIO DE FILTROS
+    El botón Buscar solo envía con clic real.
+  */
+  const filterForm = document.querySelector(".filter-form");
+
+  if (filterForm) {
+    const buscarBtn = filterForm.querySelector("button[type='submit']");
+
+    if (buscarBtn) {
+      buscarBtn.setAttribute("type", "button");
+
+      buscarBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+
+        if (filterForm.dataset.submitted === "true") {
+          return false;
+        }
+
+        filterForm.dataset.allowSubmit = "true";
+
+        if (typeof filterForm.requestSubmit === "function") {
+          filterForm.requestSubmit();
+        } else {
+          filterForm.submit();
+        }
+      });
+    }
+  }
+
+
+  /*
+    ENVÍO DE PREFACTURAS
+    El botón Enviar solo funciona con clic.
+    Enter no puede disparar el envío.
+  */
+  const botonesEnvio = document.querySelectorAll(".btn-submit-factura");
+
+  botonesEnvio.forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const form = button.closest("form");
+
+      if (!form) {
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        return false;
+      }
+
+      const confirmado = confirm("¿Confirmas que deseas enviar esta prefactura?");
+
+      if (!confirmado) {
+        return false;
+      }
+
+      form.dataset.allowSubmit = "true";
+
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+
+      return true;
+    });
+  });
+
+
+  /*
+    Función reutilizable para bloquear botones
+    después de un envío válido.
+  */
+  function bloquearBotonesFormulario(form) {
+    const submitButtons = form.querySelectorAll(
+      "button, input[type='submit']"
+    );
+
+    submitButtons.forEach(function (button) {
+      const loadingText = button.dataset.loadingText || "⏳ Procesando...";
+
+      if (button.tagName.toLowerCase() === "button") {
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = loadingText;
+      } else {
+        button.dataset.originalText = button.value;
+        button.value = loadingText;
+      }
+
+      button.disabled = true;
+      button.classList.add("btn-loading");
+    });
+  }
+
+});
+</script>
+
+<style>
+/* ==============================
+   FACTURAS PAGE
+============================== */
+
+.facturas-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   HERO
+============================== */
+
+.facturas-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.facturas-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.facturas-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 680px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-actions {
+  flex-shrink: 0;
+}
+
+/* ==============================
+   BUTTONS
+============================== */
+
+.btn,
+.page-btn,
+.action-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+/* ==============================
+   FILTERS
+============================== */
+
+.filter-card,
+.list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.filter-card {
+  margin-bottom: 22px;
+}
+
+.filter-header,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.filter-header h2,
+.list-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.filter-header p,
+.list-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filter-pill {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: 1.5fr 240px 130px auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select {
+  height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.field input:focus,
+.field select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ==============================
+   TABLE
+============================== */
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.facturas-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1040px;
+}
+
+.facturas-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.facturas-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.facturas-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.facturas-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.facturas-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.facturas-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.invoice-id {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 900;
+}
+
+.client-cell strong {
+  display: block;
+  font-weight: 850;
+  color: #111827;
+}
+
+.client-cell small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.money {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.muted {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.siigo-number {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  font-weight: 850;
+}
+
+/* ==============================
+   STATUS BADGES
+============================== */
+
+.status-badge {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-pagado,
+.status-pagada,
+.status-facturada,
+.status-enviada,
+.status-aprobada {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-pendiente,
+.status-pendiente-envio,
+.status-pendiente-siigo {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-prefactura {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.status-cancelado,
+.status-cancelada,
+.status-anulada,
+.status-error {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+/* ==============================
+   ACTIONS
+============================== */
+
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+}
+
+button.action-btn {
+  font-family: inherit;
+}
+
+.action-view {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.action-view:hover {
+  background: #dbeafe;
+}
+
+.action-edit {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.action-edit:hover {
+  background: #fed7aa;
+}
+
+.action-send {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.action-send:hover {
+  background: #d1fae5;
+}
+
+.action-print {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.action-print:hover {
+  background: #dcfce7;
+}
+
+.action-pdf {
+  background: #f8fafc;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.action-pdf:hover {
+  background: #e2e8f0;
+}
+
+/* ==============================
+   EMPTY
+============================== */
+
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* ==============================
+   PAGINATION
+============================== */
+
+.pagination {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-info {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.page-btn {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.page-btn:hover {
+  background: #e5e7eb;
+}
+
+.page-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ==============================
+   LOADING
+============================== */
+
+.btn-loading,
+button:disabled,
+input[type="submit"]:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 1080px) {
+  .filter-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .facturas-hero,
+  .list-header {
+    flex-direction: column;
+  }
+
+  .active-filters {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .facturas-page {
+    padding: 22px 14px 38px;
+  }
+
+  .facturas-hero,
+  .filter-card,
+  .list-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions,
+  .hero-actions .btn,
+  .filter-actions,
+  .filter-actions .btn {
+    width: 100%;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+  }
+
+  .facturas-table {
+    min-width: 0;
+  }
+
+  .facturas-table thead {
+    display: none;
+  }
+
+  .facturas-table,
+  .facturas-table tbody,
+  .facturas-table tr,
+  .facturas-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .facturas-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .facturas-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .facturas-table tbody td:last-child {
+    border-bottom: none;
+    display: block;
+    text-align: left;
+  }
+
+  .facturas-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .facturas-table tbody td:last-child::before {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .actions-cell {
+    justify-content: flex-start;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination-actions {
+    width: 100%;
+  }
+
+  .page-btn {
+    flex: 1;
+  }
+}
+</style>
+
+{% endblock %}

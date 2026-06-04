@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Informe de Vuelos{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/vuelos_informe.css') }}">
+
+<div class="report-page">
+
+  <!-- Encabezado -->
+  <div class="report-hero">
+    <div class="report-hero__icon">🪂</div>
+    <div>
+      <h1>Informe de Vuelos</h1>
+      <p>Consulta cuántas personas volaron por mes, paquete vendido y valor facturado.</p>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filter-card">
+    <div class="filter-card__header">
+      <h2>Filtros</h2>
+      <p>Usa <strong>Mes</strong> o <strong>Rango de fechas</strong>.</p>
+    </div>
+
+    <form method="POST" class="report-form" id="reportForm">
+      <div class="report-form__grid">
+        <div class="field">
+          <label for="mes">Mes</label>
+          <input
+            type="month"
+            id="mes"
+            name="mes"
+            value="{{ request.form.get('mes', '') }}"
+          >
+        </div>
+
+        <div class="field field--separator">
+          <span>o</span>
+        </div>
+
+        <div class="field">
+          <label for="inicio">Desde</label>
+          <input
+            type="date"
+            id="inicio"
+            name="inicio"
+            value="{{ request.form.get('inicio', '') }}"
+          >
+        </div>
+
+        <div class="field">
+          <label for="fin">Hasta</label>
+          <input
+            type="date"
+            id="fin"
+            name="fin"
+            value="{{ request.form.get('fin', '') }}"
+          >
+        </div>
+      </div>
+
+      <div class="report-form__actions">
+        <button type="submit" class="btn btn-primary">🔎 Consultar</button>
+        <button type="button" class="btn btn-light" onclick="setCurrentMonth()">📅 Este mes</button>
+        <button type="button" class="btn btn-light" onclick="setPreviousMonth()">⏮ Mes anterior</button>
+        <button type="button" class="btn btn-light" onclick="clearFilters()">🧹 Limpiar</button>
+        <button type="button" class="btn btn-outline" onclick="window.print()">🖨 Imprimir</button>
+      </div>
+    </form>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  {% if data %}
+
+    {% set total_personas = namespace(valor=0) %}
+    {% set total_facturas = namespace(valor=0) %}
+    {% set total_vendido = namespace(valor=0) %}
+    {% set total_paquetes = namespace(valor=0) %}
+
+    {% if data.resumen %}
+      {% for item in data.resumen %}
+        {% set total_personas.valor = total_personas.valor + (item.personas_estimadas | float) %}
+        {% set total_facturas.valor = total_facturas.valor + (item.total_facturas | int) %}
+        {% set total_vendido.valor = total_vendido.valor + (item.total_vendido | float) %}
+        {% set total_paquetes.valor = total_paquetes.valor + (item.paquetes_vendidos | float) %}
+      {% endfor %}
+    {% endif %}
+
+    <!-- Periodo -->
+    <div class="period-pill">
+      <span>📅 Periodo consultado:</span>
+      <strong>
+        {% if data.filtro and data.filtro.mes %}
+          {{ data.filtro.mes }}
+        {% elif data.filtro and data.filtro.inicio and data.filtro.fin %}
+          {{ data.filtro.inicio }} a {{ data.filtro.fin }}
+        {% else %}
+          Todos los meses
+        {% endif %}
+      </strong>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-card--blue">
+        <span class="kpi-label">Personas estimadas</span>
+        <strong class="kpi-value">{{ '{:,.0f}'.format(total_personas.valor).replace(',', '.') }}</strong>
+      </div>
+
+      <div class="kpi-card kpi-card--cyan">
+        <span class="kpi-label">Paquetes vendidos</span>
+        <strong class="kpi-value">{{ '{:,.0f}'.format(total_paquetes.valor).replace(',', '.') }}</strong>
+      </div>
+
+      <div class="kpi-card kpi-card--purple">
+        <span class="kpi-label">Facturas</span>
+        <strong class="kpi-value">{{ '{:,.0f}'.format(total_facturas.valor).replace(',', '.') }}</strong>
+      </div>
+
+      <div class="kpi-card kpi-card--green">
+        <span class="kpi-label">Total vendido</span>
+        <strong class="kpi-value">${{ '{:,.0f}'.format(total_vendido.valor).replace(',', '.') }}</strong>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-card">
+      <div class="tabs-header">
+        <button class="tab-btn active" type="button" onclick="switchTab('resumen', this)">📊 Resumen</button>
+        <button class="tab-btn" type="button" onclick="switchTab('top', this)">🏆 Top paquetes</button>
+        <button class="tab-btn" type="button" onclick="switchTab('detalle', this)">📋 Detalle</button>
+      </div>
+
+      <!-- TAB RESUMEN -->
+      <div class="tab-panel active" id="tab-resumen">
+        <div class="section-card">
+          <div class="section-card__header">
+            <div>
+              <h3>Resumen por mes</h3>
+              <p>Vista consolidada de facturas, paquetes, personas y ventas.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th>Facturas</th>
+                  <th>Productos</th>
+                  <th>Paquetes vendidos</th>
+                  <th>Personas estimadas</th>
+                  <th>Rango personas</th>
+                  <th>Total vendido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in data.resumen %}
+                <tr>
+                  <td><span class="badge">{{ item.mes }}</span></td>
+                  <td>{{ item.total_facturas }}</td>
+                  <td>{{ item.productos_vendidos }}</td>
+                  <td>{{ item.paquetes_vendidos }}</td>
+                  <td><strong>{{ item.personas_estimadas }}</strong></td>
+                  <td>
+                    <span class="muted-small">
+                      {{ item.personas_min_estimadas }} - {{ item.personas_max_estimadas }}
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <strong>${{ '{:,.0f}'.format(item.total_vendido|float).replace(',', '.') }}</strong>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="7" class="empty-row">No se encontraron datos para el periodo seleccionado.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB TOP -->
+      <div class="tab-panel" id="tab-top">
+        <div class="section-card">
+          <div class="section-card__header">
+            <div>
+              <h3>Top paquetes vendidos</h3>
+              <p>Los paquetes con mayor volumen e impacto en ventas.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Código</th>
+                  <th>Paquete</th>
+                  <th>Paquetes vendidos</th>
+                  <th>Personas estimadas</th>
+                  <th>Total vendido</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in data.top_paquetes %}
+                <tr>
+                  <td><span class="rank">{{ loop.index }}</span></td>
+                  <td>{{ item.codigo }}</td>
+                  <td class="package-cell">{{ item.paquete }}</td>
+                  <td>{{ item.paquetes_vendidos }}</td>
+                  <td><strong>{{ item.personas_estimadas }}</strong></td>
+                  <td class="text-right">
+                    <strong>${{ '{:,.0f}'.format(item.total_vendido|float).replace(',', '.') }}</strong>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="empty-row">No se encontraron paquetes vendidos.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB DETALLE -->
+      <div class="tab-panel" id="tab-detalle">
+        <div class="section-card">
+          <div class="section-card__header section-card__header--between">
+            <div>
+              <h3>Detalle por paquete</h3>
+              <p>Información detallada de ventas, personas y facturación por paquete.</p>
+            </div>
+
+            <div class="table-tools">
+              <input
+                type="text"
+                id="detailSearch"
+                class="table-search"
+                placeholder="Buscar por código o paquete..."
+                onkeyup="filterDetailTable()"
+              >
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="report-table" id="detailTable">
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th>Código</th>
+                  <th>Paquete</th>
+                  <th>Paquetes vendidos</th>
+                  <th>Personas</th>
+                  <th>Facturación</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in data.detalle %}
+                <tr>
+                  <td><span class="badge">{{ item.mes }}</span></td>
+                  <td>{{ item.codigo }}</td>
+                  <td class="package-cell">{{ item.paquete }}</td>
+                  <td>{{ item.paquetes_vendidos }}</td>
+                  <td>
+                    <div class="metric-stack">
+                      <div><strong>Estimadas:</strong> {{ item.personas_estimadas }}</div>
+                      <div class="muted-small">Min: {{ item.personas_min_estimadas }}</div>
+                      <div class="muted-small">Máx: {{ item.personas_max_estimadas }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="money-stack">
+                      <div><strong>Total:</strong> ${{ '{:,.0f}'.format(item.total_vendido|float).replace(',', '.') }}</div>
+                      <div class="muted-small">Subtotal: ${{ '{:,.0f}'.format(item.subtotal_vendido|float).replace(',', '.') }}</div>
+                      <div class="muted-small">Descuento: ${{ '{:,.0f}'.format(item.descuento_total|float).replace(',', '.') }}</div>
+                      <div class="muted-small">Impuesto: ${{ '{:,.0f}'.format(item.impuesto_total|float).replace(',', '.') }}</div>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="empty-row">No se encontró detalle para el periodo seleccionado.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  {% endif %}
+
+  <div class="back-row">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-back">⬅ Volver al Dashboard</a>
+  </div>
+
+</div>
+
+<script>
+  function switchTab(tabName, button) {
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+      panel.classList.remove('active');
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.classList.remove('active');
+    });
+
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    button.classList.add('active');
+  }
+
+  function clearFilters() {
+    document.getElementById('mes').value = '';
+    document.getElementById('inicio').value = '';
+    document.getElementById('fin').value = '';
+  }
+
+  function setCurrentMonth() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('mes').value = `${year}-${month}`;
+    document.getElementById('inicio').value = '';
+    document.getElementById('fin').value = '';
+  }
+
+  function setPreviousMonth() {
+    const today = new Date();
+    today.setMonth(today.getMonth() - 1);
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('mes').value = `${year}-${month}`;
+    document.getElementById('inicio').value = '';
+    document.getElementById('fin').value = '';
+  }
+
+  function filterDetailTable() {
+    const input = document.getElementById('detailSearch');
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById('detailTable');
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const text = row.textContent || row.innerText;
+      row.style.display = text.toUpperCase().includes(filter) ? '' : 'none';
+    }
+  }
+</script>
+
+{% endblock %}

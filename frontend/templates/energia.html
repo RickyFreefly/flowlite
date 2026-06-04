@@ -1,0 +1,1508 @@
+{% extends "base.html" %}
+{% block title %}Control de Energía{% endblock %}
+
+{% block content %}
+<div class="energy-page">
+
+  <!-- ========================= HEADER ========================= -->
+  <header class="energy-header">
+    <div>
+      <div class="eyebrow">Módulo operativo</div>
+      <h1>⚡ Control de Energía</h1>
+      <p>
+        Registro diario de lecturas, consumo kWh{% if is_admin %}, costos estimados{% endif %} y proyección mensual.
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-muted">↩ Volver</a>
+      <a href="{{ url_for('energia.resumen_energia') }}" class="btn btn-soft">📊 Resumen mensual</a>
+    </div>
+  </header>
+
+  <!-- ========================= KPIS ========================= -->
+  <section class="kpi-grid">
+    <article class="kpi-card total">
+      <div class="kpi-icon">⚡</div>
+      <div>
+        <span>Consumo total</span>
+        <strong>{{ "%.3f"|format(total_consumo or 0) }} kWh</strong>
+        {% if is_admin %}
+          <small>${{ "{:,.0f}".format(costo_total or 0) }}</small>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="kpi-card gravity">
+      <div class="kpi-icon">🌀</div>
+      <div>
+        <span>Gravity</span>
+        <strong>{{ "%.3f"|format(total_gravity or 0) }} kWh</strong>
+        {% if is_admin %}
+          <small>${{ "{:,.0f}".format(costo_gravity or 0) }}</small>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="kpi-card zona">
+      <div class="kpi-icon">📍</div>
+      <div>
+        <span>Zona Cero</span>
+        <strong>{{ "%.3f"|format(total_zona_cero or 0) }} kWh</strong>
+        {% if is_admin %}
+          <small>${{ "{:,.0f}".format(costo_zona_cero or 0) }}</small>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="kpi-card identificado">
+      <div class="kpi-icon">✅</div>
+      <div>
+        <span>Identificado</span>
+        <strong>{{ "%.3f"|format(total_identificado or 0) }} kWh</strong>
+        {% if is_admin %}
+          <small>${{ "{:,.0f}".format(costo_identificado or 0) }}</small>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="kpi-card restante">
+      <div class="kpi-icon">➖</div>
+      <div>
+        <span>Restante</span>
+        <strong>{{ "%.3f"|format(total_restante or 0) }} kWh</strong>
+        {% if is_admin %}
+          <small>${{ "{:,.0f}".format(costo_restante or 0) }}</small>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+
+  <!-- ========================= PANEL PRINCIPAL ========================= -->
+  <section class="main-grid">
+
+    <!-- ========================= FORMULARIO ABRIR DÍA ========================= -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>➕ Abrir día energético</h2>
+          <p>Registra las lecturas iniciales para iniciar el control diario.</p>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('energia.abrir_dia_energia') }}" class="energy-form">
+
+        <div class="form-section">
+          <h3>Datos generales</h3>
+
+          <div class="form-row two">
+            <div class="form-group">
+              <label>Fecha</label>
+              <input
+                type="date"
+                name="fecha"
+                value="{{ fecha_formulario or '' }}"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label>Valor kWh COP</label>
+              <input
+                type="number"
+                name="valor_kwh"
+                min="1"
+                step="0.01"
+                value="1000"
+                required
+                onwheel="this.blur()"
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>Lecturas iniciales</h3>
+
+          <div class="form-row three">
+            <div class="form-group">
+              <label>Total general base</label>
+              <input
+                type="number"
+                name="lectura_inicial_total"
+                min="0"
+                step="0.001"
+                required
+                onwheel="this.blur()"
+                placeholder="Ej: 10"
+              >
+              <small class="field-help">
+                Se guardará multiplicado por 760.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label>Gravity</label>
+              <input
+                type="number"
+                name="lectura_inicial_gravity"
+                min="0"
+                step="0.001"
+                required
+                onwheel="this.blur()"
+                placeholder="Ej: 8200"
+              >
+            </div>
+
+            <div class="form-group">
+              <label>Zona Cero</label>
+              <input
+                type="number"
+                name="lectura_inicial_zona_cero"
+                min="0"
+                step="0.001"
+                required
+                onwheel="this.blur()"
+                placeholder="Ej: 4300"
+              >
+            </div>
+          </div>
+
+          <div class="formula-hint">
+            El valor digitado en <strong>Total general base</strong> se multiplica automáticamente por <strong>760</strong> al guardar.
+            Gravity y Zona Cero se guardan sin multiplicar.
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>Observaciones</h3>
+
+          <div class="form-group">
+            <textarea
+              name="observaciones"
+              rows="3"
+              placeholder="Observación inicial del día..."
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">💾 Abrir día</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ========================= PANEL ESTADO ACTUAL ========================= -->
+    <aside class="panel status-panel">
+      <div class="panel-header">
+        <div>
+          <h2>📌 Estado operativo</h2>
+          <p>Lecturas y control del periodo seleccionado.</p>
+        </div>
+      </div>
+
+      <div class="status-box">
+        {% set abiertos = registros|selectattr("estado", "equalto", "ABIERTO")|list %}
+        {% set cerrados = registros|selectattr("estado", "equalto", "CERRADO")|list %}
+
+        {% if abiertos|length > 0 %}
+          <div class="status-badge open">Día abierto</div>
+          <h3>Hay {{ abiertos|length }} registro(s) pendiente(s) de cierre</h3>
+          <p>
+            Debes cerrar el día para calcular consumo total, Gravity, Zona Cero y restante.
+          </p>
+        {% elif cerrados|length > 0 %}
+          <div class="status-badge closed">Periodo con cierres</div>
+          <h3>{{ cerrados|length }} día(s) cerrado(s)</h3>
+          <p>
+            Ya existen consumos calculados en el rango consultado.
+          </p>
+        {% else %}
+          <div class="status-badge empty">Sin registros</div>
+          <h3>No hay registros en el periodo</h3>
+          <p>
+            Abre el día energético para empezar a calcular el consumo.
+          </p>
+        {% endif %}
+      </div>
+
+      <div class="mini-summary">
+        <div>
+          <span>Consumo identificado</span>
+          <strong>{{ "%.3f"|format(total_identificado or 0) }} kWh</strong>
+        </div>
+
+        {% if is_admin %}
+          <div>
+            <span>Costo identificado</span>
+            <strong>${{ "{:,.0f}".format(costo_identificado or 0) }}</strong>
+          </div>
+        {% endif %}
+
+        <div>
+          <span>Consumo restante</span>
+          <strong>{{ "%.3f"|format(total_restante or 0) }} kWh</strong>
+        </div>
+
+        {% if is_admin %}
+          <div>
+            <span>Costo restante</span>
+            <strong>${{ "{:,.0f}".format(costo_restante or 0) }}</strong>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="advice-box">
+        <strong>Regla de control:</strong>
+        <p>
+          Gravity + Zona Cero no puede superar el consumo total del contador general convertido.
+        </p>
+      </div>
+    </aside>
+  </section>
+
+  <!-- ========================= HISTÓRICO + FILTROS ========================= -->
+  <section class="panel history-panel">
+    <div class="panel-header history-header">
+      <div>
+        <h2>📑 Histórico de energía</h2>
+        <p>Consulta registros por fecha, estado y consumo calculado.</p>
+      </div>
+    </div>
+
+    <!-- FILTROS -->
+    <form method="get" action="{{ url_for('energia.listar_energia') }}" class="filters-card">
+      <div class="filter-group">
+        <label>Fecha inicio</label>
+        <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" required>
+      </div>
+
+      <div class="filter-group">
+        <label>Fecha fin</label>
+        <input type="date" name="fecha_fin" value="{{ fecha_fin }}" required>
+      </div>
+
+      <div class="filter-group">
+        <label>Estado</label>
+        <select name="estado">
+          <option value="" {% if not estado %}selected{% endif %}>Todos</option>
+          <option value="ABIERTO" {% if estado == "ABIERTO" %}selected{% endif %}>Abierto</option>
+          <option value="CERRADO" {% if estado == "CERRADO" %}selected{% endif %}>Cerrado</option>
+          <option value="ANULADO" {% if estado == "ANULADO" %}selected{% endif %}>Anulado</option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        <a href="{{ url_for('energia.listar_energia') }}" class="btn btn-light">Limpiar</a>
+      </div>
+    </form>
+
+    <div class="range-caption">
+      Mostrando registros desde <strong>{{ fecha_inicio }}</strong> hasta <strong>{{ fecha_fin }}</strong>.
+    </div>
+
+    <!-- TABLA -->
+    <div class="table-scroll">
+      <table class="energy-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th class="num">Total kWh</th>
+            <th class="num">Gravity</th>
+            <th class="num">Zona Cero</th>
+            <th class="num">Restante</th>
+
+            {% if is_admin %}
+              <th class="num">Costo total</th>
+            {% endif %}
+
+            <th>Usuario</th>
+            <th class="actions-col">Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for r in registros %}
+          <tr>
+            <td>
+              <strong>
+                {% if r.fecha %}
+                  {{ r.fecha|string|replace("T05:00:00.000Z", "") }}
+                {% else %}
+                  -
+                {% endif %}
+              </strong>
+            </td>
+
+            <td>
+              <span class="badge-estado {{ r.estado }}">
+                {{ r.estado }}
+              </span>
+            </td>
+
+            <td class="num">{{ "%.3f"|format((r.consumo_total_kwh or 0)|float) }}</td>
+            <td class="num">{{ "%.3f"|format((r.consumo_gravity_kwh or 0)|float) }}</td>
+            <td class="num">{{ "%.3f"|format((r.consumo_zona_cero_kwh or 0)|float) }}</td>
+            <td class="num">{{ "%.3f"|format((r.consumo_restante_kwh or 0)|float) }}</td>
+
+            {% if is_admin %}
+              <td class="num money">${{ "{:,.0f}".format((r.costo_total or 0)|float) }}</td>
+            {% endif %}
+
+            <td>{{ r.usuario or "-" }}</td>
+
+            <td>
+              <div class="actions-flex">
+                <a
+                  href="{{ url_for('energia.detalle_energia', id=r.idenergia_registro) }}"
+                  class="icon-btn view"
+                  title="Ver detalle"
+                >
+                  👁️
+                </a>
+
+                {% if r.estado == "ABIERTO" %}
+                  <button
+                    type="button"
+                    class="icon-btn close-day"
+                    title="Cerrar día"
+                    onclick="abrirModalCerrar(
+                      '{{ r.idenergia_registro }}',
+                      '{{ r.fecha }}',
+                      '{{ r.lectura_inicial_total }}',
+                      '{{ r.lectura_inicial_gravity }}',
+                      '{{ r.lectura_inicial_zona_cero }}'
+                    )"
+                  >
+                    ✅
+                  </button>
+                {% endif %}
+
+                {% if r.estado != "ANULADO" %}
+                  <button
+                    type="button"
+                    class="icon-btn cancel"
+                    title="Anular"
+                    onclick="abrirModalAnular('{{ r.idenergia_registro }}')"
+                  >
+                    🚫
+                  </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ 9 if is_admin else 8 }}" class="empty">
+              ⚠️ No hay registros de energía en el periodo seleccionado.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<!-- ========================= MODAL CERRAR DÍA ========================= -->
+<div class="modal-backdrop" id="modalCerrar">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div>
+        <h3>✅ Cerrar día energético</h3>
+        <p>Registra las lecturas finales para calcular el consumo.</p>
+      </div>
+      <button type="button" class="modal-close" onclick="cerrarModalCerrar()">×</button>
+    </div>
+
+    <form method="post" id="cerrarDiaForm">
+      <div class="modal-body">
+        <div class="info-box">
+          <div>
+            <span>Registro</span>
+            <strong id="modalRegistroId">-</strong>
+          </div>
+          <div>
+            <span>Fecha</span>
+            <strong id="modalFecha">-</strong>
+          </div>
+        </div>
+
+        <div class="modal-grid">
+          <div class="reading-block">
+            <h4>Total general</h4>
+
+            <label>Inicial convertido</label>
+            <input type="text" id="modalInicialTotal" readonly>
+
+            <label>Final base</label>
+            <input
+              type="number"
+              name="lectura_final_total"
+              id="lecturaFinalTotal"
+              min="0"
+              step="0.001"
+              required
+              onwheel="this.blur()"
+              oninput="calcularPreviewCierre()"
+              placeholder="Ej: 12"
+            >
+
+            <small class="field-help">
+              Este valor se multiplicará por 760 al cerrar.
+            </small>
+          </div>
+
+          <div class="reading-block">
+            <h4>Gravity</h4>
+            <label>Inicial</label>
+            <input type="text" id="modalInicialGravity" readonly>
+
+            <label>Final</label>
+            <input
+              type="number"
+              name="lectura_final_gravity"
+              id="lecturaFinalGravity"
+              min="0"
+              step="0.001"
+              required
+              onwheel="this.blur()"
+              oninput="calcularPreviewCierre()"
+            >
+          </div>
+
+          <div class="reading-block">
+            <h4>Zona Cero</h4>
+            <label>Inicial</label>
+            <input type="text" id="modalInicialZonaCero" readonly>
+
+            <label>Final</label>
+            <input
+              type="number"
+              name="lectura_final_zona_cero"
+              id="lecturaFinalZonaCero"
+              min="0"
+              step="0.001"
+              required
+              onwheel="this.blur()"
+              oninput="calcularPreviewCierre()"
+            >
+          </div>
+        </div>
+
+        <div class="preview-box">
+          <h4>Vista previa del consumo</h4>
+
+          <div class="preview-grid">
+            <div>
+              <span>Total convertido</span>
+              <strong id="previewTotal">0.000 kWh</strong>
+            </div>
+
+            <div>
+              <span>Gravity</span>
+              <strong id="previewGravity">0.000 kWh</strong>
+            </div>
+
+            <div>
+              <span>Zona Cero</span>
+              <strong id="previewZonaCero">0.000 kWh</strong>
+            </div>
+
+            <div>
+              <span>Restante</span>
+              <strong id="previewRestante">0.000 kWh</strong>
+            </div>
+          </div>
+
+          <p class="preview-warning" id="previewWarning" style="display:none;">
+            ⚠️ Gravity + Zona Cero no puede superar el consumo total convertido.
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label>Observaciones de cierre</label>
+          <textarea name="observaciones" rows="3" placeholder="Observación de cierre..."></textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-light" onclick="cerrarModalCerrar()">Cancelar</button>
+        <button type="submit" class="btn btn-success" id="btnCerrarDia">Cerrar día</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================= MODAL ANULAR ========================= -->
+<div class="modal-backdrop" id="modalAnular">
+  <div class="modal-card small">
+    <div class="modal-header">
+      <div>
+        <h3>🚫 Anular registro</h3>
+        <p>El registro no se elimina, solo cambia a estado ANULADO.</p>
+      </div>
+      <button type="button" class="modal-close" onclick="cerrarModalAnular()">×</button>
+    </div>
+
+    <form method="post" id="anularForm">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Motivo de anulación</label>
+          <textarea name="observaciones" rows="3" required>Registro anulado desde control de energía</textarea>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-light" onclick="cerrarModalAnular()">Cancelar</button>
+        <button type="submit" class="btn btn-danger">Anular</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================= SCRIPT ========================= -->
+<script>
+const FACTOR_TOTAL_GENERAL = 760;
+
+let cierreState = {
+  id: null,
+  inicialTotalConvertido: 0,
+  inicialGravity: 0,
+  inicialZonaCero: 0
+};
+
+function parseNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function formatKwh(value) {
+  return `${Number(value || 0).toFixed(3)} kWh`;
+}
+
+function abrirModalCerrar(id, fecha, inicialTotal, inicialGravity, inicialZonaCero) {
+  cierreState = {
+    id,
+    inicialTotalConvertido: parseNumber(inicialTotal),
+    inicialGravity: parseNumber(inicialGravity),
+    inicialZonaCero: parseNumber(inicialZonaCero)
+  };
+
+  document.getElementById("modalRegistroId").textContent = id;
+  document.getElementById("modalFecha").textContent = String(fecha || "").replace("T05:00:00.000Z", "");
+
+  document.getElementById("modalInicialTotal").value = cierreState.inicialTotalConvertido.toFixed(3);
+  document.getElementById("modalInicialGravity").value = cierreState.inicialGravity.toFixed(3);
+  document.getElementById("modalInicialZonaCero").value = cierreState.inicialZonaCero.toFixed(3);
+
+  document.getElementById("lecturaFinalTotal").value = "";
+  document.getElementById("lecturaFinalGravity").value = "";
+  document.getElementById("lecturaFinalZonaCero").value = "";
+
+  document.getElementById("cerrarDiaForm").action = `/energia/${id}/cerrar-dia`;
+
+  calcularPreviewCierre();
+
+  document.getElementById("modalCerrar").classList.add("active");
+}
+
+function cerrarModalCerrar() {
+  document.getElementById("modalCerrar").classList.remove("active");
+}
+
+function calcularPreviewCierre() {
+  const finalTotalBase = parseNumber(document.getElementById("lecturaFinalTotal").value);
+  const finalTotalConvertido = finalTotalBase * FACTOR_TOTAL_GENERAL;
+
+  const finalGravity = parseNumber(document.getElementById("lecturaFinalGravity").value);
+  const finalZonaCero = parseNumber(document.getElementById("lecturaFinalZonaCero").value);
+
+  const consumoTotal = finalTotalConvertido - cierreState.inicialTotalConvertido;
+  const consumoGravity = finalGravity - cierreState.inicialGravity;
+  const consumoZonaCero = finalZonaCero - cierreState.inicialZonaCero;
+  const restante = consumoTotal - consumoGravity - consumoZonaCero;
+
+  document.getElementById("previewTotal").textContent = formatKwh(Math.max(consumoTotal, 0));
+  document.getElementById("previewGravity").textContent = formatKwh(Math.max(consumoGravity, 0));
+  document.getElementById("previewZonaCero").textContent = formatKwh(Math.max(consumoZonaCero, 0));
+  document.getElementById("previewRestante").textContent = formatKwh(restante);
+
+  const invalid =
+    consumoTotal < 0 ||
+    consumoGravity < 0 ||
+    consumoZonaCero < 0 ||
+    restante < 0;
+
+  document.getElementById("previewWarning").style.display = invalid ? "block" : "none";
+  document.getElementById("btnCerrarDia").disabled = invalid;
+}
+
+function abrirModalAnular(id) {
+  document.getElementById("anularForm").action = `/energia/${id}/anular`;
+  document.getElementById("modalAnular").classList.add("active");
+}
+
+function cerrarModalAnular() {
+  document.getElementById("modalAnular").classList.remove("active");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener("wheel", event => {
+      event.preventDefault();
+      input.blur();
+    }, { passive: false });
+  });
+});
+</script>
+
+<!-- ========================= ESTILOS ========================= -->
+<style>
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --energy-bg: #f4f7fb;
+  --energy-card: #ffffff;
+  --energy-border: #e2e8f0;
+  --energy-text: #243447;
+  --energy-muted: #64748b;
+  --energy-blue: #0d6efd;
+  --energy-green: #22c55e;
+  --energy-orange: #f97316;
+  --energy-purple: #7c3aed;
+  --energy-yellow: #facc15;
+  --energy-red: #dc3545;
+  --energy-shadow: 0 14px 35px rgba(15, 23, 42, 0.07);
+}
+
+.energy-page {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 28px 24px 42px;
+  background: var(--energy-bg);
+  min-height: 100vh;
+  color: var(--energy-text);
+}
+
+/* ========================= HEADER ========================= */
+
+.energy-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  background: #eaf2ff;
+  color: #2156a3;
+  border: 1px solid #cfe0ff;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.energy-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  color: var(--energy-text);
+  font-weight: 800;
+}
+
+.energy-header p {
+  margin: 7px 0 0;
+  color: var(--energy-muted);
+  font-size: 0.98rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ========================= BOTONES ========================= */
+
+.btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 15px;
+  font-weight: 800;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  font-size: 0.92rem;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: var(--energy-blue);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(13, 110, 253, 0.22);
+}
+
+.btn-primary:hover {
+  background: #075fd8;
+}
+
+.btn-success {
+  background: var(--energy-green);
+  color: #fff;
+}
+
+.btn-danger {
+  background: var(--energy-red);
+  color: #fff;
+}
+
+.btn-muted {
+  background: #6c757d;
+  color: #fff;
+}
+
+.btn-soft {
+  background: #edf2ff;
+  color: #263fa3;
+}
+
+.btn-light {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid var(--energy-border);
+}
+
+.btn:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========================= KPI ========================= */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi-card {
+  background: var(--energy-card);
+  border: 1px solid var(--energy-border);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  box-shadow: var(--energy-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+}
+
+.kpi-card.total::before { background: var(--energy-blue); }
+.kpi-card.gravity::before { background: var(--energy-green); }
+.kpi-card.zona::before { background: var(--energy-orange); }
+.kpi-card.identificado::before { background: #0ea5e9; }
+.kpi-card.restante::before { background: var(--energy-purple); }
+
+.kpi-icon {
+  width: 43px;
+  height: 43px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--energy-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.kpi-card span {
+  display: block;
+  color: var(--energy-muted);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.kpi-card strong {
+  display: block;
+  color: var(--energy-text);
+  font-size: 1.3rem;
+  line-height: 1.15;
+  margin-top: 3px;
+}
+
+.kpi-card small {
+  display: block;
+  color: #334155;
+  font-weight: 800;
+  margin-top: 3px;
+}
+
+/* ========================= PANELS ========================= */
+
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.panel {
+  background: var(--energy-card);
+  border: 1px solid var(--energy-border);
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: var(--energy-shadow);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.22rem;
+  color: var(--energy-text);
+}
+
+.panel-header p {
+  margin: 5px 0 0;
+  color: var(--energy-muted);
+  font-size: 0.9rem;
+}
+
+/* ========================= FORMULARIO ========================= */
+
+.energy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-section {
+  border: 1px solid #edf2f7;
+  background: #fbfdff;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.form-section h3 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.form-row {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  align-items: start;
+}
+
+.form-row.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-group,
+.filter-group,
+.reading-block {
+  min-width: 0;
+}
+
+.form-group label,
+.filter-group label,
+.reading-block label {
+  display: block;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #34495e;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.field-help {
+  display: block;
+  margin-top: 6px;
+  color: var(--energy-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd8e3;
+  border-radius: 11px;
+  padding: 10px 11px;
+  font-size: 0.94rem;
+  outline: none;
+  background: #fff;
+  color: var(--energy-text);
+  display: block;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--energy-blue);
+  box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.08);
+}
+
+input[readonly] {
+  background: #f8fafc;
+  color: #475569;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.formula-hint {
+  margin-top: 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ========================= STATUS ========================= */
+
+.status-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.status-box {
+  border-radius: 16px;
+  padding: 18px;
+  background: linear-gradient(135deg, #f8fafc, #eef6ff);
+  border: 1px solid #dbeafe;
+}
+
+.status-box h3 {
+  margin: 10px 0 5px;
+  color: var(--energy-text);
+  font-size: 1.15rem;
+}
+
+.status-box p {
+  margin: 0;
+  color: var(--energy-muted);
+  line-height: 1.45;
+}
+
+.status-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.status-badge.open {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.status-badge.closed {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #bbf7d0;
+}
+
+.status-badge.empty {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.mini-summary {
+  margin-top: 15px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.mini-summary div {
+  border: 1px solid var(--energy-border);
+  border-radius: 13px;
+  padding: 12px;
+  background: #fff;
+}
+
+.mini-summary span {
+  display: block;
+  color: var(--energy-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.mini-summary strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--energy-text);
+  font-size: 1.05rem;
+}
+
+.advice-box {
+  margin-top: auto;
+  border-radius: 14px;
+  padding: 13px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  color: #713f12;
+}
+
+.advice-box p {
+  margin: 5px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* ========================= HISTÓRICO ========================= */
+
+.history-panel {
+  padding-bottom: 20px;
+}
+
+.history-header {
+  margin-bottom: 14px;
+}
+
+.filters-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--energy-border);
+  border-radius: 16px;
+  padding: 14px;
+  align-items: end;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.range-caption {
+  margin: 12px 0;
+  color: var(--energy-muted);
+  font-size: 0.9rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--energy-border);
+  border-radius: 16px;
+}
+
+.energy-table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+.energy-table thead {
+  background: #0d6efd;
+  color: #fff;
+}
+
+.energy-table th {
+  padding: 13px 14px;
+  text-align: left;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.energy-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #eef2f7;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.energy-table tbody tr:nth-child(even) {
+  background: #fbfdff;
+}
+
+.energy-table tbody tr:hover {
+  background: #f1f7ff;
+}
+
+.num {
+  text-align: right !important;
+}
+
+.money {
+  font-weight: 800;
+  color: #0f5132 !important;
+}
+
+.actions-col {
+  text-align: center !important;
+}
+
+.badge-estado {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  display: inline-flex;
+}
+
+.badge-estado.ABIERTO {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.badge-estado.CERRADO {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-estado.ANULADO {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.actions-flex {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.icon-btn:hover {
+  transform: translateY(-1px);
+}
+
+.icon-btn.view {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.icon-btn.close-day {
+  background: #dcfce7;
+  color: #047857;
+}
+
+.icon-btn.cancel {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.empty {
+  text-align: center;
+  color: var(--energy-muted);
+  padding: 22px !important;
+  font-style: italic;
+}
+
+/* ========================= MODALES ========================= */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 18px;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal-card {
+  background: #fff;
+  width: min(880px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  border-radius: 22px;
+  box-shadow: 0 26px 80px rgba(0,0,0,0.32);
+}
+
+.modal-card.small {
+  width: min(520px, 100%);
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--energy-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--energy-text);
+}
+
+.modal-header p {
+  margin: 4px 0 0;
+  color: var(--energy-muted);
+  font-size: 0.9rem;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 30px;
+  cursor: pointer;
+  color: var(--energy-muted);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-actions {
+  padding: 16px 24px;
+  border-top: 1px solid var(--energy-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.info-box {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--energy-border);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.info-box span {
+  display: block;
+  color: var(--energy-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.info-box strong {
+  display: block;
+  color: var(--energy-text);
+  margin-top: 3px;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 13px;
+}
+
+.reading-block {
+  border: 1px solid var(--energy-border);
+  background: #fbfdff;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.reading-block h4 {
+  margin: 0 0 12px;
+  color: var(--energy-text);
+}
+
+.reading-block input {
+  margin-bottom: 10px;
+}
+
+.preview-box {
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 16px;
+  margin: 16px 0;
+  background: #f8fbff;
+}
+
+.preview-box h4 {
+  margin: 0 0 12px;
+  color: var(--energy-text);
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.preview-grid div {
+  background: #fff;
+  border: 1px solid var(--energy-border);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.preview-grid span {
+  display: block;
+  color: var(--energy-muted);
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+.preview-grid strong {
+  color: var(--energy-text);
+}
+
+.preview-warning {
+  color: var(--energy-red);
+  font-weight: 800;
+  margin: 12px 0 0;
+}
+
+/* ========================= RESPONSIVE ========================= */
+
+@media (max-width: 1180px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .energy-header {
+    flex-direction: column;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .btn {
+    flex: 1;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+
+  .form-row.two,
+  .form-row.three,
+  .filters-card,
+  .modal-grid,
+  .preview-grid,
+  .info-box {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .energy-page {
+    padding: 18px 12px 32px;
+  }
+
+  .panel {
+    padding: 17px;
+    border-radius: 16px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+}
+</style>
+{% endblock %}

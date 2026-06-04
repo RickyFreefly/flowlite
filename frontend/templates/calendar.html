@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Calendario de Reservas{% endblock %}
+
+{% block content %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/calendario.css') }}">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<div class="calendar-container">
+
+    <!-- ================= MINI DASHBOARD ================= -->
+    <div class="mini-dashboard">
+        <div class="mini-card">
+            <h4>Hoy</h4>
+            <p id="count-today">0</p>
+        </div>
+
+        <div class="mini-card">
+            <h4>Esta semana</h4>
+            <p id="count-week">0</p>
+        </div>
+
+        <div class="mini-card">
+            <h4>Este mes</h4>
+            <p id="count-month">0</p>
+        </div>
+    </div>
+
+    <!-- ================= FILTROS ================= -->
+    <div class="filters-box">
+        <select id="filter-service">
+            <option value="">Todos los servicios</option>
+            <option value="vuelo_individual">Vuelo Individual</option>
+            <option value="vuelo_pareja">Vuelo Pareja</option>
+            <option value="vuelo_grupal">Vuelos Grupales</option>
+            <option value="evento">Eventos</option>
+        </select>
+
+        <select id="filter-status">
+            <option value="">Todos los estados</option>
+            <option value="confirmed">Confirmadas</option>
+            <option value="pending">Pendientes</option>
+            <option value="cancelled">Canceladas</option>
+        </select>
+
+        <select id="filter-instructor">
+            <option value="">Todos los instructores</option>
+            {% for inst in instructores %}
+            <option value="{{ inst }}">{{ inst }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+        <!-- 🔙 BOTÓN VOLVER -->
+    <div class="back-button-box">
+        <a href="{{ url_for('dashboard.index') }}" class="btn-back">
+            ⬅️ Volver al Dashboard
+        </a>
+    </div>
+
+    <!-- ================= TITULO ================= -->
+    <div class="header-card">
+        <h2>📅 Calendario de Reservas</h2>
+        <p>Consulta todas las citas programadas.</p>
+    </div>
+
+    <!-- ================= CALENDARIO ================= -->
+    <div class="card-section">
+        <div id="calendar"></div>
+    </div>
+</div>
+
+<!-- ================= JSON seguro ================= -->
+<script id="events-data" type="application/json">
+    {{ events|tojson|safe }}
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    // ========== ICONOS POR TIPO DE SERVICIO ==========
+    const ICONS = {
+        vuelo_individual: "✈️",
+        vuelo_pareja: "👫",
+        vuelo_grupal: "🎉",
+        evento: "🎁",
+        default: "📌"
+    };
+
+    // ========== CARGAR EVENTOS ==========
+    var eventsData = JSON.parse(
+        document.getElementById("events-data").textContent
+    );
+
+    var styledEvents = eventsData.map(ev => ({
+        ...ev,
+        title: `${ICONS[ev.type] || ICONS.default} ${ev.title}`,
+        classNames: [ev.type, ev.status]
+    }));
+
+    // ========== MINI DASHBOARD ==========
+    function updateMiniDashboard(events) {
+        let today = 0, week = 0, month = 0;
+        const now = new Date();
+
+        events.forEach(ev => {
+            let d = new Date(ev.start);
+
+            if (d.toDateString() === now.toDateString()) today++;
+            if (isInWeek(d, now)) week++;
+            if (d.getMonth() === now.getMonth()) month++;
+        });
+
+        document.getElementById("count-today").innerText = today;
+        document.getElementById("count-week").innerText = week;
+        document.getElementById("count-month").innerText = month;
+    }
+
+    function isInWeek(date, now) {
+        const first = new Date(now.setDate(now.getDate() - now.getDay()));
+        const last = new Date(now.setDate(now.getDate() - now.getDay() + 6));
+        return date >= first && date <= last;
+    }
+
+    updateMiniDashboard(styledEvents);
+
+    // ========== FULLCALENDAR ==========
+    var calendarEl = document.getElementById("calendar");
+
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: "dayGridMonth",
+        height: "auto",
+
+        headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,listWeek"
+        },
+
+            /* 👇 HORARIO LABORAL DE 8AM A 8PM */
+        slotMinTime: "08:00:00",
+        slotMaxTime: "20:00:00",
+
+        events: styledEvents,
+
+        eventMouseEnter(info) {
+            let tooltip = document.createElement("div");
+            tooltip.classList.add("tooltip-event");
+            tooltip.innerHTML = `
+                <strong>${info.event.title}</strong><br>
+                ${info.event.start.toLocaleString()}<br>
+                ${info.event.end.toLocaleString()}
+            `;
+            document.body.appendChild(tooltip);
+
+            info.el.onmousemove = (e) => {
+                tooltip.style.display = "block";
+                tooltip.style.top = (e.pageY + 15) + "px";
+                tooltip.style.left = (e.pageX + 15) + "px";
+            };
+            info.el.onmouseleave = () => tooltip.remove();
+        }
+    });
+
+    calendar.render();
+
+    // ========== FILTROS AVANZADOS ==========
+    function applyFilters() {
+        const svc = document.getElementById("filter-service").value;
+        const status = document.getElementById("filter-status").value;
+        const inst = document.getElementById("filter-instructor").value;
+
+        let filtered = styledEvents.filter(ev =>
+            (svc === "" || ev.type === svc) &&
+            (status === "" || ev.status === status) &&
+            (inst === "" || ev.instructor === inst)
+        );
+
+        calendar.removeAllEvents();
+        calendar.addEventSource(filtered);
+        updateMiniDashboard(filtered);
+    }
+
+    ["filter-service", "filter-status", "filter-instructor"].forEach(id => {
+        document.getElementById(id).addEventListener("change", applyFilters);
+    });
+
+});
+</script>
+
+{% endblock %}

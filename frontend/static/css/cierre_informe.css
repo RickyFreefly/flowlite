@@ -1,0 +1,144 @@
+.informe-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: "Poppins", sans-serif;
+}
+
+.header-card {
+  text-align: center;
+  background: #f8faff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  margin-bottom: 25px;
+}
+.header-card h2 {
+  color: #007bff;
+  margin-bottom: 10px;
+}
+.header-card p {
+  color: #666;
+}
+
+.form-fechas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+.form-group label {
+  margin-bottom: 5px;
+  color: #444;
+}
+input[type="date"] {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  color: #999;
+  font-weight: 500;
+}
+
+.btn-consultar {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.btn-consultar:hover {
+  background-color: #0056b3;
+}
+
+.alert.error {
+  background: #f8d7da;
+  color: #842029;
+  padding: 12px;
+  border-radius: 6px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.fecha-cierre {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.fecha-cierre span {
+  color: #007bff;
+  font-weight: 600;
+}
+
+.card-section, .card-summary {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.styled-table th, .styled-table td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+.styled-table th {
+  background-color: #f2f4f8;
+}
+.ingreso td {
+  color: #198754;
+}
+.egreso td {
+  color: #dc3545;
+}
+
+.summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+.summary-item {
+  background: #f8f9fa;
+  padding: 15px 20px;
+  border-radius: 10px;
+  text-align: center;
+  min-width: 150px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.summary-item h5 {
+  margin: 0;
+  color: #555;
+}
+.summary-item p {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+.summary-item.ingresos p { color: #28a745; }
+.summary-item.egresos p { color: #dc3545; }
+.summary-item.saldo-neto p { color: #007bff; }
+
+.btn-volver {
+  background-color: #6c757d;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+}
+.btn-volver:hover {
+  background-color: #5a6268;
+}

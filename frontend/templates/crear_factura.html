@@ -1,0 +1,1669 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if editar %}Editar Prefactura{% else %}Nueva Factura{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="invoice-form-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="invoice-hero">
+    <div>
+      <a href="{{ url_for('facturas.listar_facturas') }}" class="back-link">
+        ← Volver a facturas
+      </a>
+
+      <h1>
+        {% if editar %}
+          Editar Prefactura #{{ factura.idfactura }}
+        {% else %}
+          Crear Factura
+        {% endif %}
+      </h1>
+
+      <p>
+        {% if editar %}
+          Actualiza la información de la prefactura antes de enviarla.
+        {% else %}
+          Registra una factura manualmente o genera una factura desde una reserva existente.
+        {% endif %}
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-badge">
+      {% if editar %}
+        Prefactura
+      {% else %}
+        Nuevo documento
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- ==============================
+       FORMULARIO PRINCIPAL
+  =============================== -->
+  {% if editar %}
+    <form method="post"
+          action="{{ url_for('facturas.actualizar_prefactura', id=factura.idfactura) }}"
+          class="invoice-form"
+          id="invoiceForm"
+          onsubmit="return validarSaldoSeguro()">
+
+      <input type="hidden" id="enviarFlag" name="enviar" value="false">
+      <input type="hidden" name="idfactura" value="{{ factura.idfactura }}">
+
+  {% else %}
+    <form method="post"
+          action="{{ url_for('facturas.crear_factura') }}"
+          class="invoice-form"
+          id="invoiceForm"
+          onsubmit="return validarSaldoSeguro()">
+  {% endif %}
+
+    <!-- No enviar idempresa ni idusuario desde HTML -->
+    <input type="hidden"
+           id="idcliente"
+           name="idcliente"
+           value="{% if editar %}{{ cliente.idcliente }}{% elif idCliente %}{{ idCliente }}{% elif cliente %}{{ cliente.idcliente }}{% elif reserva %}{{ reserva.idcliente }}{% endif %}">
+
+    {% if not editar %}
+      <input type="hidden"
+             id="idreserva"
+             name="idreserva"
+             value="{{ idReserva or (reserva.id if reserva else '') }}">
+    {% endif %}
+
+    <!-- ==============================
+         MODO DE CREACIÓN
+    =============================== -->
+    {% if not editar %}
+    <section class="form-card mode-card">
+      <div class="section-heading">
+        <div>
+          <h2>Origen de la factura</h2>
+          <p>Selecciona si vas a crear una factura manual o desde una reserva.</p>
+        </div>
+      </div>
+
+      <div class="mode-switch">
+        <label class="mode-option">
+          <input type="radio"
+                 name="modo"
+                 value="manual"
+                 {% if not reserva %}checked{% endif %}
+                 onclick="toggleModo('manual')">
+          <span class="mode-icon">✍️</span>
+          <span>
+            <strong>Crear manualmente</strong>
+            <small>Buscar cliente y agregar productos.</small>
+          </span>
+        </label>
+
+        <label class="mode-option">
+          <input type="radio"
+                 name="modo"
+                 value="reserva"
+                 {% if reserva %}checked{% endif %}
+                 onclick="toggleModo('reserva')">
+          <span class="mode-icon">📅</span>
+          <span>
+            <strong>Desde una reserva</strong>
+            <small>Cargar cliente, producto y abono.</small>
+          </span>
+        </label>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- ==============================
+         CLIENTE
+    =============================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Cliente</h2>
+          <p>Información del cliente asociado al documento.</p>
+        </div>
+      </div>
+
+      {% if editar %}
+
+        <div class="info-box success">
+          <div>
+            <span class="info-label">Cliente</span>
+            <strong>
+              {{ cliente.nombre_cliente or cliente.razonsocial or ((cliente.nombres or '') ~ ' ' ~ (cliente.apellidos or '')) }}
+            </strong>
+          </div>
+          <div>
+            <span class="info-label">Identificación</span>
+            <strong>{{ cliente.identificacion }}</strong>
+          </div>
+        </div>
+
+      {% else %}
+
+        <!-- Manual -->
+        <div id="manual-section" style="{% if reserva %}display:none{% endif %}">
+          <div class="search-row">
+            <div class="field">
+              <label for="buscarIdentificacion">Identificación del cliente</label>
+              <input type="text"
+                     id="buscarIdentificacion"
+                     placeholder="Digite la identificación"
+                     value="{{ identificacion or (cliente.identificacion if cliente else '') }}">
+            </div>
+
+            <button type="button" class="btn btn-light" onclick="buscarCliente()">
+              🔍 Buscar cliente
+            </button>
+          </div>
+
+          <div id="cliente-info" class="info-box">
+            {% if cliente %}
+              <div>
+                <span class="info-label">Nombre</span>
+                <strong>
+                  {{ cliente.razonsocial or ((cliente.nombres or '') ~ ' ' ~ (cliente.apellidos or '')) }}
+                </strong>
+              </div>
+              <div>
+                <span class="info-label">Email</span>
+                <strong>{{ cliente.contact_email or cliente.email or 'N/A' }}</strong>
+              </div>
+            {% else %}
+              <p class="muted">Busca un cliente por identificación para continuar.</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Reserva -->
+        <div id="reserva-section" style="{% if not reserva %}display:none{% endif %}">
+          <div class="search-row">
+            <div class="field">
+              <label for="identificacion">Identificación del cliente</label>
+              <input type="text"
+                     id="identificacion"
+                     placeholder="Digite la identificación"
+                     value="{{ reserva.identificacion if reserva else '' }}">
+            </div>
+
+            <button type="button" class="btn btn-light" onclick="cargarReserva()">
+              🔍 Buscar reserva
+            </button>
+          </div>
+
+          <div id="reserva-info" class="info-box">
+            {% if reserva %}
+              <div>
+                <span class="info-label">Cliente</span>
+                <strong>{{ reserva.nombre_cliente }}</strong>
+              </div>
+              <div>
+                <span class="info-label">Producto</span>
+                <strong>{{ reserva.producto }}</strong>
+              </div>
+              <div>
+                <span class="info-label">Valor</span>
+                <strong>${{ "{:,.0f}".format(reserva.precio).replace(",", ".") }}</strong>
+              </div>
+              <div>
+                <span class="info-label">Abono</span>
+                <strong>${{ "{:,.0f}".format(reserva.abono).replace(",", ".") }}</strong>
+              </div>
+              <div>
+                <span class="info-label">Medio</span>
+                <strong>{{ reserva.medio }}</strong>
+              </div>
+            {% else %}
+              <p class="muted">Busca una reserva por identificación para cargar la información.</p>
+            {% endif %}
+          </div>
+        </div>
+
+      {% endif %}
+    </section>
+
+    <!-- ==============================
+         OBSERVACIONES
+    =============================== -->
+    <section class="form-card">
+      <div class="section-heading">
+        <div>
+          <h2>Observaciones</h2>
+          <p>Notas internas o información adicional de la factura.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <textarea id="observaciones"
+                  name="observaciones"
+                  placeholder="Escribe notas adicionales si aplica...">{% if editar %}{{ factura.observaciones or '' }}{% elif reserva %}Factura generada desde reserva del cliente {{ reserva.identificacion }}{% endif %}</textarea>
+      </div>
+    </section>
+
+    <!-- ==============================
+         DETALLES
+    =============================== -->
+    <section class="form-card">
+      <div class="section-heading section-between">
+        <div>
+          <h2>Productos / servicios</h2>
+          <p>Agrega los productos o servicios que componen la factura.</p>
+        </div>
+
+        <button type="button" class="btn btn-light" onclick="addDetalle()">
+          ➕ Agregar detalle
+        </button>
+      </div>
+
+      <div class="detail-header">
+        <span>Buscar</span>
+        <span>Producto</span>
+        <span>Cantidad</span>
+        <span>Valor</span>
+        <span></span>
+      </div>
+
+      <div id="detalles" class="dynamic-list">
+
+        {% if editar %}
+          {% for d in detalles %}
+            <div class="detalle-row" id="detalle_{{ loop.index0 }}">
+              <div class="search-wrapper">
+                <span>🔍</span>
+                <input type="text"
+                       id="search_{{ loop.index0 }}"
+                       placeholder="Código o nombre"
+                       onkeyup="filtrarProductos({{ loop.index0 }})">
+              </div>
+
+              <select name="detalles[{{ loop.index0 }}][idproducto]"
+                      id="producto_{{ loop.index0 }}"
+                      onchange="setPrecio(this, {{ loop.index0 }})"
+                      required>
+                {% for p in productos %}
+                  <option value="{{ p.idproducto }}"
+                          data-precio="{{ p.precio }}"
+                          data-codigo="{{ p.codigo }}"
+                          {% if p.idproducto == d.idproducto %}selected{% endif %}>
+                    {{ p.codigo }} · {{ p.nombre }}
+                  </option>
+                {% endfor %}
+              </select>
+
+              <input type="number"
+                     name="detalles[{{ loop.index0 }}][cantidad]"
+                     value="{{ d.cantidad }}"
+                     min="1"
+                     oninput="actualizarSubtotal({{ loop.index0 }})"
+                     required>
+
+              <input type="number"
+                     step="0.01"
+                     name="detalles[{{ loop.index0 }}][valorunitario]"
+                     id="valor_{{ loop.index0 }}"
+                     value="{{ d.valorunitario }}"
+                     data-unitario="{{ d.valorunitario }}"
+                     oninput="actualizarTotales()"
+                     required>
+
+              <button type="button"
+                      class="btn-delete"
+                      onclick="eliminarDetalle({{ loop.index0 }})">
+                ✕
+              </button>
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if reserva and not editar %}
+          <div class="detalle-row" id="detalle_0">
+            <div class="search-wrapper">
+              <span>🔍</span>
+              <input type="text"
+                     id="search_0"
+                     placeholder="Código o nombre"
+                     onkeyup="filtrarProductos(0)">
+            </div>
+
+            <select name="detalles[0][idproducto]"
+                    id="producto_0"
+                    onchange="setPrecio(this, 0)"
+                    required>
+              <option value="{{ reserva.idproducto }}"
+                      data-precio="{{ reserva.precio }}"
+                      selected>
+                {{ reserva.idproducto }} · {{ reserva.producto }}
+              </option>
+            </select>
+
+            <input type="number"
+                   name="detalles[0][cantidad]"
+                   value="1"
+                   min="1"
+                   oninput="actualizarSubtotal(0)"
+                   required>
+
+            <input type="number"
+                   step="0.01"
+                   name="detalles[0][valorunitario]"
+                   id="valor_0"
+                   value="{{ reserva.precio }}"
+                   data-unitario="{{ reserva.precio }}"
+                   oninput="actualizarTotales()"
+                   required>
+
+            <button type="button" class="btn-delete" onclick="eliminarDetalle(0)">
+              ✕
+            </button>
+          </div>
+        {% endif %}
+
+      </div>
+    </section>
+
+    <!-- ==============================
+         PAGOS
+    =============================== -->
+    <section class="form-card">
+      <div class="section-heading section-between">
+        <div>
+          <h2>Pagos</h2>
+          <p>Registra los medios de pago, abonos o saldo pendiente.</p>
+        </div>
+
+        <button type="button" class="btn btn-light" onclick="addPago()">
+          ➕ Agregar pago
+        </button>
+      </div>
+
+      <div class="payment-header">
+        <span>Medio</span>
+        <span>Valor</span>
+        <span>Fecha</span>
+        <span></span>
+      </div>
+
+      <div id="pagos" class="dynamic-list">
+
+        {% if editar %}
+          {% for p in pagos %}
+            <div class="pago-row" id="pago_{{ loop.index0 }}">
+              <select name="pagos[{{ loop.index0 }}][idmedio]">
+                {% for m in medios %}
+                  <option value="{{ m.idmedio }}"
+                          {% if m.idmedio|string == p.idmedio|string %}selected{% endif %}>
+                    {{ m.nombre }}
+                  </option>
+                {% endfor %}
+              </select>
+
+              <input type="number"
+                     step="0.01"
+                     name="pagos[{{ loop.index0 }}][valor]"
+                     value="{{ p.valor }}"
+                     oninput="actualizarTotales()">
+
+              <input type="date"
+                     name="pagos[{{ loop.index0 }}][due_date]"
+                     value="{{ p.due_date|default(datetime.now().strftime('%Y-%m-%d')) }}">
+
+              <button type="button"
+                      class="btn-delete"
+                      onclick="eliminarPago({{ loop.index0 }})">
+                ✕
+              </button>
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if reserva and not editar %}
+          <div class="pago-row" id="pago_0">
+            <input type="hidden" name="pagos[0][idmedio]" value="{{ reserva.idmedio }}">
+            <input type="text" value="{{ reserva.medio }}" readonly>
+            <input type="number" step="0.01" name="pagos[0][valor]" value="{{ reserva.abono }}" readonly>
+            <input type="date" name="pagos[0][due_date]" value="{{ datetime.now().strftime('%Y-%m-%d') }}" readonly>
+            <span></span>
+          </div>
+        {% endif %}
+
+      </div>
+    </section>
+
+    <!-- ==============================
+         TOTALES
+    =============================== -->
+    <section class="totals-panel">
+      <div class="total-card total-blue">
+        <span>Total factura</span>
+        <strong id="totalFactura">
+          {% if editar %}{{ factura.total }}{% elif reserva %}{{ reserva.precio }}{% else %}0.00{% endif %}
+        </strong>
+      </div>
+
+      <div class="total-card total-green">
+        <span>Total pagado</span>
+        <strong id="totalPagado">
+          {% if editar %}
+            {{ pagos|sum(attribute="valor") }}
+          {% elif reserva %}
+            {{ reserva.abono }}
+          {% else %}
+            0.00
+          {% endif %}
+        </strong>
+      </div>
+
+      <div class="total-card total-red" id="saldoCard">
+        <span>Saldo pendiente</span>
+        <strong id="saldoPendiente">
+          {% if editar %}
+            {{ factura.total - (pagos|sum(attribute="valor")) }}
+          {% elif reserva %}
+            {{ reserva.precio - reserva.abono }}
+          {% else %}
+            0.00
+          {% endif %}
+        </strong>
+      </div>
+    </section>
+
+    <!-- ==============================
+         ACCIONES
+    =============================== -->
+    <section class="form-actions-sticky">
+      <div class="actions-note">
+        {% if editar %}
+          Revisa los cambios antes de guardar o enviar.
+        {% else %}
+          Puedes enviar la factura o guardarla como prefactura.
+        {% endif %}
+      </div>
+
+      <div class="actions-buttons">
+        <a href="{{ url_for('facturas.listar_facturas') }}" class="btn btn-light">
+          Cancelar
+        </a>
+
+        {% if editar %}
+          <button type="submit"
+                  class="btn btn-secondary"
+                  onclick="document.getElementById('enviarFlag').value = 'false'">
+            💾 Guardar cambios
+          </button>
+
+          <button type="button"
+                  class="btn btn-primary"
+                  id="btnEnviarSiigo"
+                  style="display: none;"
+                  onclick="enviarPrefacturaSiigo()">
+            📤 Enviar
+          </button>
+        {% else %}
+          <button type="button"
+                  class="btn btn-secondary"
+                  onclick="enviarPrefactura()">
+            📝 Guardar prefactura
+          </button>
+
+          <button type="button"
+                  id="btnGuardar"
+                  class="btn btn-primary"
+                  style="display: none;"
+                  onclick="enviarFacturaFinal()">
+            📤 Enviar factura
+          </button>
+        {% endif %}
+      </div>
+    </section>
+
+  </form>
+</div>
+
+<!-- ==============================
+     ESTILOS
+=============================== -->
+<style>
+.invoice-form-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 22px 54px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.invoice-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.invoice-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.invoice-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-badge {
+  min-height: 38px;
+  max-width: 280px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.invoice-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.section-heading h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.section-between {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mode-option {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 16px;
+  cursor: pointer;
+  transition: 0.2s ease;
+  background: #f8fafc;
+}
+
+.mode-option:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.mode-option input {
+  accent-color: #2563eb;
+}
+
+.mode-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: #e0f2fe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.mode-option strong {
+  display: block;
+  color: #111827;
+  font-size: 0.98rem;
+}
+
+.mode-option small {
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea,
+.detalle-row input,
+.detalle-row select,
+.pago-row input,
+.pago-row select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field textarea {
+  min-height: 110px;
+  padding: 14px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.detalle-row input:focus,
+.detalle-row select:focus,
+.pago-row input:focus,
+.pago-row select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.info-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.info-box.success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.info-label {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.info-box strong {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.muted {
+  color: #64748b;
+  margin: 0;
+}
+
+.dynamic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-header,
+.detalle-row {
+  display: grid;
+  grid-template-columns: 1.1fr 2fr 120px 160px 46px;
+  gap: 10px;
+  align-items: center;
+}
+
+.payment-header,
+.pago-row {
+  display: grid;
+  grid-template-columns: 1.4fr 160px 160px 46px;
+  gap: 10px;
+  align-items: center;
+}
+
+.detail-header,
+.payment-header {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-wrapper span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.search-wrapper input {
+  padding-left: 38px;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-light {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #0f172a;
+  color: #fff;
+}
+
+.btn-secondary:hover {
+  background: #1e293b;
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-delete {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+  font-weight: 900;
+  transition: 0.2s ease;
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+}
+
+.totals-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.total-card {
+  border-radius: 20px;
+  padding: 20px;
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+}
+
+.total-card span {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.total-card strong {
+  display: block;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.total-blue {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.total-green {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.total-red {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+}
+
+.total-red.saldo-ok {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.actions-note {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.actions-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .invoice-hero,
+  .section-between,
+  .form-actions-sticky {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-header,
+  .payment-header {
+    display: none;
+  }
+
+  .detalle-row,
+  .pago-row {
+    grid-template-columns: 1fr;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .totals-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-buttons {
+    justify-content: stretch;
+  }
+
+  .actions-buttons .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 620px) {
+  .invoice-form-page {
+    padding: 22px 14px 42px;
+  }
+
+  .invoice-hero,
+  .form-card,
+  .form-actions-sticky {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .mode-switch {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-buttons {
+    flex-direction: column;
+  }
+
+  .actions-buttons .btn,
+  .btn {
+    width: 100%;
+  }
+}
+</style>
+
+<!-- ==============================
+     SCRIPTS
+=============================== -->
+<script>
+let productos = [];
+let medios = [];
+let detalleIndex = {{ detalles|length if editar else (1 if reserva else 0) }};
+let pagoIndex = {{ pagos|length if editar else (1 if reserva else 0) }};
+
+function normalizarNumero(valor) {
+  if (valor === null || valor === undefined) return 0;
+
+  let texto = String(valor).trim();
+
+  if (texto.includes(",") && texto.includes(".")) {
+    texto = texto.replace(/\./g, "").replace(",", ".");
+  } else {
+    texto = texto.replace(/,/g, ".");
+  }
+
+  texto = texto.replace(/[^0-9.-]/g, "");
+
+  const numero = parseFloat(texto);
+  return isNaN(numero) ? 0 : numero;
+}
+
+function obtenerSaldoPendiente() {
+  const saldoPendiente = document.getElementById("saldoPendiente");
+  return saldoPendiente ? normalizarNumero(saldoPendiente.innerText || saldoPendiente.textContent) : 0;
+}
+
+function controlarBotonEnviarFactura() {
+  const saldo = obtenerSaldoPendiente();
+
+  const btnGuardar = document.getElementById("btnGuardar");
+  const btnEnviarSiigo = document.getElementById("btnEnviarSiigo");
+
+  const puedeEnviar = saldo <= 0;
+
+  if (btnGuardar) {
+    btnGuardar.style.display = puedeEnviar ? "inline-flex" : "none";
+  }
+
+  if (btnEnviarSiigo) {
+    btnEnviarSiigo.style.display = puedeEnviar ? "inline-flex" : "none";
+  }
+}
+
+function validarSaldo() {
+  const saldo = obtenerSaldoPendiente();
+
+  if (saldo > 0) {
+    alert("No puedes enviar la factura porque todavía existe saldo pendiente.");
+    controlarBotonEnviarFactura();
+    return false;
+  }
+
+  return true;
+}
+
+function enviarFacturaFinal() {
+  const form = document.getElementById("invoiceForm");
+
+  if (!form) {
+    alert("No se encontró el formulario de factura.");
+    return;
+  }
+
+  if (!validarSaldo()) {
+    return;
+  }
+
+  if (form.dataset.submitted === "true") {
+    return;
+  }
+
+  form.dataset.allowSubmit = "true";
+
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+  } else {
+    form.submit();
+  }
+}
+
+function validarSaldoSeguro() {
+  return validarSaldo();
+}
+
+function toggleModo(modo) {
+  const reservaSection = document.getElementById('reserva-section');
+  const manualSection = document.getElementById('manual-section');
+
+  if (reservaSection) reservaSection.style.display = (modo === 'reserva') ? 'block' : 'none';
+  if (manualSection) manualSection.style.display = (modo === 'manual') ? 'block' : 'none';
+}
+
+async function cargarProductosYMedios() {
+  try {
+    const respProd = await fetch("/facturas/buscar_productos");
+    if (respProd.ok) productos = await respProd.json();
+
+    const respMedios = await fetch("/facturas/buscar_medios");
+    if (respMedios.ok) medios = await respMedios.json();
+
+  } catch (err) {
+    console.error("Error cargando catálogos:", err);
+  }
+}
+
+function addDetalle() {
+  const div = document.createElement('div');
+  div.classList.add("detalle-row");
+  div.setAttribute("id", `detalle_${detalleIndex}`);
+
+  let options = '<option value="">Selecciona producto</option>';
+  productos.forEach(p => {
+    const label = `${p.codigo} · ${p.nombre}`;
+    options += `<option value="${p.idproducto}" data-precio="${p.precio}" data-codigo="${p.codigo}">${label}</option>`;
+  });
+
+  div.innerHTML = `
+    <div class="search-wrapper">
+      <span>🔍</span>
+      <input type="text" id="search_${detalleIndex}" placeholder="Código o nombre" onkeyup="filtrarProductos(${detalleIndex})">
+    </div>
+
+    <select name="detalles[${detalleIndex}][idproducto]" id="producto_${detalleIndex}"
+            onchange="setPrecio(this, ${detalleIndex})" required>
+      ${options}
+    </select>
+
+    <input type="number" name="detalles[${detalleIndex}][cantidad]" value="1" min="1"
+           oninput="actualizarSubtotal(${detalleIndex})" required>
+
+    <input type="number" step="0.01" name="detalles[${detalleIndex}][valorunitario]"
+           id="valor_${detalleIndex}" oninput="actualizarTotales()" required>
+
+    <button type="button" class="btn-delete" onclick="eliminarDetalle(${detalleIndex})">✕</button>
+  `;
+
+  document.getElementById("detalles").appendChild(div);
+  detalleIndex++;
+}
+
+function filtrarProductos(index) {
+  const input = document.getElementById(`search_${index}`);
+  const filtro = input.value.toUpperCase();
+  const select = document.getElementById(`producto_${index}`);
+  const opciones = select.getElementsByTagName("option");
+  let matchExacto = null;
+
+  for (let i = 0; i < opciones.length; i++) {
+    const texto = opciones[i].textContent.toUpperCase();
+    const codigo = opciones[i].dataset.codigo ? opciones[i].dataset.codigo.toUpperCase() : "";
+    const coincide = texto.includes(filtro) || codigo.includes(filtro);
+    opciones[i].style.display = coincide ? "" : "none";
+    if (codigo === filtro) matchExacto = opciones[i];
+  }
+
+  if (matchExacto) {
+    select.value = matchExacto.value;
+    setPrecio(select, index);
+  }
+}
+
+function eliminarDetalle(i) {
+  const row = document.getElementById(`detalle_${i}`);
+  if (row) row.remove();
+  actualizarTotales();
+}
+
+function setPrecio(selectElem, index) {
+  const selected = selectElem.options[selectElem.selectedIndex];
+  const precio = selected ? selected.dataset.precio || 0 : 0;
+
+  const valorInput = document.querySelector(`#valor_${index}`);
+  if (!valorInput) return;
+
+  valorInput.value = precio;
+  valorInput.dataset.unitario = precio;
+
+  actualizarSubtotal(index);
+}
+
+function actualizarSubtotal(i) {
+  const cantidadInput = document.querySelector(`input[name="detalles[${i}][cantidad]"]`);
+  const valorInput = document.getElementById(`valor_${i}`);
+
+  if (!cantidadInput || !valorInput) return;
+
+  const cantidad = parseFloat(cantidadInput.value) || 1;
+  const precioUnitario = parseFloat(valorInput.dataset.unitario || valorInput.value || 0);
+
+  valorInput.value = (precioUnitario * cantidad).toFixed(2);
+
+  actualizarTotales();
+}
+
+function addPago() {
+  const div = document.createElement('div');
+  div.classList.add("pago-row");
+  div.setAttribute("id", `pago_${pagoIndex}`);
+
+  let options = '<option value="">Medio</option>';
+  medios.forEach(m => {
+    options += `<option value="${m.idmedio}">${m.nombre}</option>`;
+  });
+
+  div.innerHTML = `
+    <select name="pagos[${pagoIndex}][idmedio]">${options}</select>
+    <input type="number" step="0.01" name="pagos[${pagoIndex}][valor]" placeholder="Valor" oninput="actualizarTotales()">
+    <input type="date" name="pagos[${pagoIndex}][due_date]" value="{{ datetime.now().strftime('%Y-%m-%d') }}">
+    <button type="button" class="btn-delete" onclick="eliminarPago(${pagoIndex})">✕</button>
+  `;
+
+  document.getElementById("pagos").appendChild(div);
+  pagoIndex++;
+}
+
+function eliminarPago(i) {
+  const row = document.getElementById(`pago_${i}`);
+  if (row) row.remove();
+  actualizarTotales();
+}
+
+function actualizarTotales() {
+  let total = 0;
+
+  document.querySelectorAll("[id^=valor_]").forEach(input => {
+    total += parseFloat(input.value) || 0;
+  });
+
+  const totalFactura = document.getElementById("totalFactura");
+  if (totalFactura) totalFactura.innerText = total.toFixed(2);
+
+  let pagado = 0;
+
+  document.querySelectorAll(".pago-row input[name*='[valor]']").forEach(input => {
+    pagado += parseFloat(input.value) || 0;
+  });
+
+  const totalPagado = document.getElementById("totalPagado");
+  if (totalPagado) totalPagado.innerText = pagado.toFixed(2);
+
+  const saldo = total - pagado;
+  const saldoPendiente = document.getElementById("saldoPendiente");
+  const saldoCard = document.getElementById("saldoCard");
+
+  if (saldoPendiente) saldoPendiente.innerText = saldo.toFixed(2);
+
+  if (saldoCard) {
+    if (saldo <= 0) {
+      saldoCard.classList.add("saldo-ok");
+    } else {
+      saldoCard.classList.remove("saldo-ok");
+    }
+  }
+
+  controlarBotonEnviarFactura();
+}
+
+function construirPayloadDesdeFormulario() {
+  const form = document.querySelector("#invoiceForm");
+  const fd = new FormData(form);
+
+  const data = {
+    idcliente: fd.get("idcliente"),
+    observaciones: fd.get("observaciones") || "",
+    detalles: [],
+    pagos: []
+  };
+
+  fd.forEach((value, key) => {
+    const match = key.match(/detalles\[(\d+)\]\[(.*?)\]/);
+    if (match) {
+      const index = match[1];
+      if (!data.detalles[index]) data.detalles[index] = {};
+      data.detalles[index][match[2]] = value;
+    }
+  });
+
+  fd.forEach((value, key) => {
+    const match = key.match(/pagos\[(\d+)\]\[(.*?)\]/);
+    if (match) {
+      const index = match[1];
+      if (!data.pagos[index]) data.pagos[index] = {};
+      data.pagos[index][match[2]] = value;
+    }
+  });
+
+  data.detalles = Object.values(data.detalles).filter(d => d.idproducto);
+  data.pagos = Object.values(data.pagos).filter(p => p.idmedio || p.valor);
+
+  return data;
+}
+
+function enviarPrefactura() {
+  {% if editar %}
+    alert("Esta prefactura ya existe. Usa 'Guardar cambios'.");
+    return;
+  {% endif %}
+
+  const data = construirPayloadDesdeFormulario();
+
+  if (!data.idcliente) {
+    alert("Debes seleccionar o buscar un cliente antes de guardar la prefactura.");
+    return;
+  }
+
+  if (!data.detalles.length) {
+    alert("Debes agregar al menos un producto o servicio.");
+    return;
+  }
+
+  fetch("/facturas/crear_prefactura", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  })
+    .then(async r => {
+      const resp = await r.json();
+
+      if (!r.ok || resp.success === false) {
+        throw new Error(resp.error || resp.message || "Error guardando prefactura");
+      }
+
+      alert("Prefactura guardada correctamente");
+      window.location.href = "/facturas";
+    })
+    .catch(err => {
+      console.error("Error guardando prefactura:", err);
+      alert(err.message || "Error guardando prefactura");
+    });
+}
+
+async function buscarCliente() {
+  const identificacion = document.getElementById("buscarIdentificacion").value.trim();
+
+  if (!identificacion) {
+    alert("Ingresa una identificación primero");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/facturas/buscar_cliente?identificacion=${encodeURIComponent(identificacion)}`);
+
+    if (!resp.ok) {
+      alert("Error consultando el cliente");
+      return;
+    }
+
+    const data = await resp.json();
+
+    if (!data || data.length === 0) {
+      document.getElementById("cliente-info").innerHTML = `
+        <p style="color:#b91c1c; font-weight:800;">Cliente no encontrado</p>
+      `;
+      document.getElementById("idcliente").value = "";
+      return;
+    }
+
+    const cliente = data[0];
+    const nombre = cliente.razonsocial || `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim();
+
+    document.getElementById("cliente-info").innerHTML = `
+      <div>
+        <span class="info-label">Nombre</span>
+        <strong>${nombre || "Cliente sin nombre"}</strong>
+      </div>
+      <div>
+        <span class="info-label">Email</span>
+        <strong>${cliente.contact_email || cliente.email || "N/A"}</strong>
+      </div>
+    `;
+
+    document.getElementById("idcliente").value = cliente.idcliente;
+
+  } catch (err) {
+    console.error("Error buscando cliente:", err);
+    alert("Error consultando el servidor");
+  }
+}
+
+async function cargarReserva() {
+  const identificacion = document.getElementById("identificacion").value.trim();
+
+  if (!identificacion) {
+    alert("Ingresa una identificación primero");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/facturas/buscar_reserva/${encodeURIComponent(identificacion)}`);
+
+    if (resp.status === 401) {
+      alert("Tu sesión expiró. Inicia sesión nuevamente.");
+      window.location.href = "/login";
+      return;
+    }
+
+    if (!resp.ok) {
+      alert("Error consultando reserva");
+      return;
+    }
+
+    const data = await resp.json();
+
+    if (!data || data.length === 0) {
+      document.getElementById("reserva-info").innerHTML = `
+        <p style="color:#b91c1c; font-weight:800;">No se encontraron reservas para esta identificación</p>
+      `;
+      return;
+    }
+
+    const r = Array.isArray(data) ? data[0] : data;
+
+    document.getElementById("reserva-info").innerHTML = `
+      <div>
+        <span class="info-label">Cliente</span>
+        <strong>${r.nombre_cliente}</strong>
+      </div>
+      <div>
+        <span class="info-label">Producto</span>
+        <strong>${r.producto}</strong>
+      </div>
+      <div>
+        <span class="info-label">Valor</span>
+        <strong>$${parseFloat(r.precio || 0).toLocaleString()}</strong>
+      </div>
+      <div>
+        <span class="info-label">Abono</span>
+        <strong>$${parseFloat(r.abono || 0).toLocaleString()}</strong>
+      </div>
+      <div>
+        <span class="info-label">Medio</span>
+        <strong>${r.medio}</strong>
+      </div>
+    `;
+
+    document.getElementById("idreserva").value = r.id || r.idreserva;
+    document.getElementById("idcliente").value = r.idcliente;
+
+    const detallesDiv = document.getElementById("detalles");
+    detallesDiv.innerHTML = "";
+
+    const detalle = document.createElement("div");
+    detalle.classList.add("detalle-row");
+    detalle.setAttribute("id", "detalle_0");
+
+    detalle.innerHTML = `
+      <div class="search-wrapper">
+        <span>🔍</span>
+        <input type="text" id="search_0" placeholder="Código o nombre" onkeyup="filtrarProductos(0)">
+      </div>
+
+      <select name="detalles[0][idproducto]" id="producto_0"
+              onchange="setPrecio(this, 0)" required>
+        <option value="${r.idproducto}"
+                data-precio="${r.precio}"
+                selected>
+          ${r.idproducto} · ${r.producto}
+        </option>
+      </select>
+
+      <input type="number" name="detalles[0][cantidad]"
+             value="1" min="1"
+             oninput="actualizarSubtotal(0)" required>
+
+      <input type="number" step="0.01"
+             name="detalles[0][valorunitario]"
+             id="valor_0"
+             value="${r.precio}"
+             data-unitario="${r.precio}"
+             oninput="actualizarTotales()" required>
+
+      <button type="button" class="btn-delete" onclick="eliminarDetalle(0)">✕</button>
+    `;
+
+    detallesDiv.appendChild(detalle);
+
+    const pagosDiv = document.getElementById("pagos");
+    pagosDiv.innerHTML = "";
+
+    const pago = document.createElement("div");
+    pago.classList.add("pago-row");
+    pago.setAttribute("id", "pago_0");
+
+    pago.innerHTML = `
+      <input type="hidden" name="pagos[0][idmedio]" value="${r.idmedio}">
+      <input type="text" value="${r.medio}" readonly>
+      <input type="number" step="0.01" name="pagos[0][valor]" value="${r.abono}" readonly>
+      <input type="date" name="pagos[0][due_date]" value="${new Date().toISOString().split('T')[0]}" readonly>
+      <span></span>
+    `;
+
+    pagosDiv.appendChild(pago);
+
+    document.getElementById("totalFactura").innerText = parseFloat(r.precio || 0).toFixed(2);
+    document.getElementById("totalPagado").innerText = parseFloat(r.abono || 0).toFixed(2);
+    document.getElementById("saldoPendiente").innerText = ((parseFloat(r.precio || 0)) - (parseFloat(r.abono || 0))).toFixed(2);
+
+    detalleIndex = 1;
+    pagoIndex = 1;
+    actualizarTotales();
+
+  } catch (err) {
+    console.error("Error cargando reserva:", err);
+    alert("Error consultando el servidor");
+  }
+}
+
+function enviarPrefacturaSiigo() {
+  if (!validarSaldo()) {
+    return;
+  }
+
+  const flag = document.getElementById('enviarFlag');
+  if (flag) flag.value = 'true';
+
+  const form = document.querySelector('#invoiceForm');
+
+  if (form) {
+    if (form.dataset.submitted === "true") {
+      return;
+    }
+
+    form.dataset.allowSubmit = "true";
+
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+  } else {
+    alert("No se encontró el formulario de prefactura");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  cargarProductosYMedios();
+  actualizarTotales();
+  controlarBotonEnviarFactura();
+
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+  const form = document.getElementById("invoiceForm");
+
+  if (form) {
+    form.addEventListener("submit", function (event) {
+      {% if not editar %}
+      if (form.dataset.allowSubmit !== "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+      {% endif %}
+
+      if (!validarSaldo()) {
+        event.preventDefault();
+        event.stopPropagation();
+        form.dataset.allowSubmit = "false";
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        event.preventDefault();
+        return false;
+      }
+
+      form.dataset.submitted = "true";
+
+      const buttons = form.querySelectorAll("button");
+      buttons.forEach(btn => {
+        if (!btn.dataset.originalText) {
+          btn.dataset.originalText = btn.innerHTML;
+        }
+
+        if (btn.id === "btnGuardar" || btn.id === "btnEnviarSiigo") {
+          btn.innerHTML = "⏳ Procesando...";
+        }
+
+        btn.disabled = true;
+        btn.classList.add("btn-loading");
+      });
+
+      return true;
+    });
+  }
+});
+</script>
+
+{% endblock %}

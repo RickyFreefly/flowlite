@@ -1,0 +1,244 @@
+/* ============================
+   CONTENEDOR GENERAL
+============================ */
+.calendar-container {
+    max-width: 1100px;
+    margin: 25px auto;
+    padding: 0 10px;
+    font-family: "Poppins", sans-serif;
+}
+
+/* ============================
+   TARJETA DEL HEADER
+============================ */
+.header-card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 25px 30px;
+    margin-bottom: 25px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.header-card h2 {
+    margin: 0 0 6px 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.header-card p {
+    color: #667;
+    font-size: 15px;
+}
+
+
+/* ============================
+   TARJETA DEL CALENDARIO
+============================ */
+.card-section {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================
+   FULLCALENDAR ESTILOS
+============================ */
+
+/* Quitar bordes fuertes */
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard td,
+.fc-theme-standard th {
+    border-color: #eceff4;
+}
+
+/* Título del mes */
+.fc-toolbar-title {
+    font-size: 22px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+}
+
+/* ============================
+   BOTONES FULLCALENDAR
+============================ */
+.fc-button {
+    background-color: #4CAF50 !important;
+    border: none !important;
+    padding: 6px 14px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    text-transform: capitalize !important;
+}
+
+.fc-button:hover {
+    background-color: #43a047 !important;
+}
+
+.fc-button-active {
+    background-color: #388e3c !important;
+}
+
+/* Botón "Hoy" */
+.fc-today-button {
+    background-color: #2196F3 !important;
+}
+
+.fc-today-button:hover {
+    background-color: #1976D2 !important;
+}
+
+/* ============================
+   ESTILOS DE LOS DÍAS
+============================ */
+.fc-daygrid-day {
+    background: #fafbff;
+    border-radius: 4px;
+}
+
+.fc-daygrid-day.fc-day-today {
+    background: #e3f3ff !important;
+    border: 1px solid #90caf9;
+}
+
+
+/* ============================
+   EVENTOS (FORMATO PILL)
+============================ */
+.fc-daygrid-event {
+    background: #ffffff !important;
+    padding: 6px 8px !important;
+    margin: 4px 0 !important;
+    border-radius: 14px !important;
+    border-left-width: 6px !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    font-size: 12px !important;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+/* Hover suave */
+.fc-daygrid-event:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+/* ============================
+   COLORES POR ESTADO
+============================ */
+.event-confirmed {
+    border-left-color: #2ecc71 !important; /* Verde */
+}
+
+.event-pending {
+    border-left-color: #f1c40f !important; /* Amarillo */
+}
+
+.event-cancelled {
+    border-left-color: #e74c3c !important; /* Rojo */
+}
+
+.event-default {
+    border-left-color: #3498db !important; /* Azul */
+}
+
+/* ============================
+   TOOLTIP MODERNO
+============================ */
+.tooltip-event {
+    position: absolute;
+    background: #ffffff;
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    z-index: 9999;
+    pointer-events: none;
+    display: none;
+    border-left: 4px solid #3498db;
+}
+
+.tooltip-event strong {
+    font-size: 14px;
+    color: #2c3e50;
+}
+
+/* Animación suave */
+.tooltip-event.show {
+    display: block;
+    opacity: 1;
+    transition: opacity 0.15s ease-in-out;
+}
+
+.filters-box {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.filters-box select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: white;
+}
+
+.mini-dashboard {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.mini-card {
+    flex: 1;
+    padding: 15px 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.mini-card h4 {
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+}
+
+.mini-card p {
+    font-size: 22px;
+    font-weight: bold;
+    margin: 8px 0 0;
+    color: #007bff;
+}
+
+/* ============================
+   BOTÓN VOLVER
+============================ */
+.back-button-box {
+    margin: 10px 0 20px 0;
+    text-align: left;
+}
+
+.btn-back {
+    display: inline-block;
+    background: #20c997;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+}
+
+.btn-back:hover {
+    background: #17b187;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+}

@@ -1,0 +1,6 @@
+Flask==3.0.3
+Flask-WTF==1.2.1       # Formularios con validaciones
+email-validator==2.2.0 # Validación de correos
+bcrypt==4.2.0          # Hash de contraseñas si lo usas en el frontend
+requests               # Consumo de APIs
+gunicorn               # Servidor WSGI para Render

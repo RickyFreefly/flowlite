@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios{% endblock %}
+
+{% block content %}
+  <h1>Lista de Usuarios</h1>
+  <a href="{{ url_for('dashboard.index') }}">⬅️ Volver</a>
+  <ul>
+    {% for u in usuarios %}
+      <li>{{ u.nombrecompleto }} ({{ u.username }}) - Rol: {{ u.rol }}</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

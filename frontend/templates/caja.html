@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Caja{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cierredia.css') }}">
+
+<div class="dashboard-container">
+  <h1 class="page-title">💰 Gestión de Caja</h1>
+  <a href="{{ url_for('dashboard.index') }}" class="btn-volver">⬅️ Volver</a>
+
+  <!-- ====== Totales ====== -->
+  <div class="card-section">
+    <h3 class="section-title">📊 Totales</h3>
+    <hr>
+    <div class="totales-grid">
+      <div class="total-card azul">
+        <h4>Total Caja</h4>
+        <p>${{ "{:,.2f}".format(total_caja) }}</p>
+      </div>
+      <div class="total-card verde">
+        <h4>Total Ingresos</h4>
+        <p>${{ "{:,.2f}".format(total_ingresos) }}</p>
+      </div>
+      <div class="total-card rojo">
+        <h4>Total Egresos</h4>
+        <p>${{ "{:,.2f}".format(total_egresos) }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== Formulario de movimiento ====== -->
+  <div class="card-form">
+    <h3 class="form-title">➕ Registrar Movimiento</h3>
+    <form method="post" action="{{ url_for('caja.crear_caja') }}" class="egreso-form">
+
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>📅 Fecha</label>
+          <input type="date" name="fecha_mostrar" value="{{ fecha_actual }}" readonly>
+        </div>
+
+        <div class="form-group">
+          <label>💡 Concepto</label>
+          <input type="text" name="concepto" placeholder="Ej: Ingreso por ventas" required>
+        </div>
+
+        <div class="form-group">
+          <label>🏢 Proveedor / Cliente</label>
+          <input type="text" name="proveedor" placeholder="Ej: Cliente Juan Pérez" required>
+        </div>
+
+        <div class="form-group">
+          <label>💲 Valor</label>
+          <input type="number" step="0.01" name="valor" placeholder="0.00" required>
+        </div>
+
+        <div class="form-group">
+          <label>🔁 Tipo de Movimiento</label>
+          <select name="movimiento" required>
+            <option value="ENTRADA">Entrada</option>
+            <option value="SALIDA">Salida</option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label>📝 Observación</label>
+          <input type="text" name="observacion" placeholder="Escriba una nota opcional">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">💾 Guardar Movimiento</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ====== Listado de movimientos ====== -->
+  <div class="table-responsive">
+    <table class="styled-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Concepto</th>
+          <th>Proveedor</th>
+          <th>Valor</th>
+          <th>Movimiento</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in movimientos %}
+        <tr>
+          <td>{{ c.idcaja }}</td>
+          <td>{{ c.fecha[:10] }}</td>
+          <td>
+            <a href="{{ url_for('caja.detalle_caja', id=c.idcaja) }}" class="btn-link">
+              {{ c.concepto }}
+            </a>
+          </td>
+          <td>{{ c.proveedor }}</td>
+          <td>${{ "{:,.2f}".format(c.valor|float) }}</td>
+          <td>
+            {% if c.movimiento == 'ENTRADA' %}
+              <span class="badge entrada">ENTRADA</span>
+            {% else %}
+              <span class="badge salida">SALIDA</span>
+            {% endif %}
+          </td>
+          <td>{{ c.usuario or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const inputValor = document.getElementById("valor");
+
+  // Formateo dinámico con separadores de miles
+  inputValor.addEventListener("input", (e) => {
+    let v = e.target.value.replace(/,/g, ""); // quitar comas
+    if (v === "") return;
+    if (isNaN(v)) return;
+
+    const partes = v.split(".");
+    partes[0] = Number(partes[0]).toLocaleString("en-US");
+    e.target.value = partes.join(".");
+  });
+
+  // Antes de enviar, quitar separadores para que el backend reciba un número limpio
+  document.querySelector("form").addEventListener("submit", () => {
+    inputValor.value = inputValor.value.replace(/,/g, "");
+  });
+</script>
+
+<style>
+/* ===== Totales ===== */
+.card-section {
+  margin-top: 20px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.totales-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: space-around;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.total-card {
+  flex: 1;
+  min-width: 220px;
+  border-radius: 12px;
+  color: #fff;
+  text-align: center;
+  padding: 20px 10px;
+  font-weight: 600;
+}
+.total-card h4 {
+  margin-bottom: 6px;
+  font-size: 1.1em;
+}
+.total-card p {
+  font-size: 1.6em;
+  margin: 0;
+  font-weight: bold;
+}
+.azul { background: #007bff; }
+.verde { background: #28a745; }
+.rojo { background: #dc3545; }
+</style>
+{% endblock %}

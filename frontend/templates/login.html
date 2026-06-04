@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+
+<div class="login-page">
+
+  <div class="login-card">
+
+    <!-- Logo -->
+    <div class="login-brand">
+      <img src="{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
+           alt="FlowLite"
+           class="login-logo">
+
+      <h1>Iniciar sesión</h1>
+      <p>Ingresa tus credenciales para acceder al sistema.</p>
+    </div>
+
+    <!-- Mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrapper">
+          {% for category, message in messages %}
+            <div class="flash-message flash-{{ category }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Formulario -->
+    <form method="post" autocomplete="off" id="loginForm" novalidate>
+
+      <div class="form-field">
+        <label for="username">Usuario</label>
+
+        <div class="input-group">
+          <span class="input-icon">👤</span>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="Digite su usuario"
+            required
+            value="{{ username or '' }}"
+            autocomplete="username"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+          >
+        </div>
+
+        <small class="field-error" id="usernameError">
+          El usuario es obligatorio.
+        </small>
+      </div>
+
+      <div class="form-field">
+        <label for="password">Contraseña</label>
+
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Digite su contraseña"
+            required
+            autocomplete="current-password"
+          >
+
+          <button
+            type="button"
+            class="toggle-password"
+            onclick="togglePassword()"
+            aria-label="Mostrar u ocultar contraseña"
+          >
+            👁️
+          </button>
+        </div>
+
+        <small class="field-error" id="passwordError">
+          La contraseña es obligatoria.
+        </small>
+      </div>
+
+      <button type="submit" class="btn-login" id="btnLogin">
+        <span class="btn-text">Ingresar</span>
+        <span class="btn-loader" aria-hidden="true"></span>
+      </button>
+
+      <p class="forgot-password">
+        ¿Olvidaste tu contraseña?
+        <a href="#">Recupérala aquí</a>
+      </p>
+
+    </form>
+
+  </div>
+
+</div>
+
+<style>
+/* ==============================
+   LOGIN MODERNO
+============================== */
+
+.login-page {
+  min-height: 100vh;
+  padding: 32px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.14), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 430px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e2e8f0;
+  border-radius: 28px;
+  padding: 34px;
+  box-shadow: 0 24px 55px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(14px);
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.login-logo {
+  width: 170px;
+  max-width: 100%;
+  margin-bottom: 18px;
+}
+
+.login-brand h1 {
+  margin: 0 0 8px 0;
+  color: #111827;
+  font-size: 2rem;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.login-brand p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+/* ==============================
+   FLASH
+============================== */
+
+.flash-wrapper {
+  margin-bottom: 18px;
+}
+
+.flash-message {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.flash-success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.flash-warning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.flash-danger,
+.flash-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.flash-info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* ==============================
+   FORMULARIO
+============================== */
+
+.form-field {
+  margin-bottom: 18px;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  min-height: 52px;
+  transition: 0.2s ease;
+}
+
+.input-group:focus-within {
+  background: #fff;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.10);
+}
+
+.input-group.invalid {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10);
+}
+
+.input-icon {
+  width: 48px;
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.input-group input {
+  width: 100%;
+  height: 52px;
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0 14px 0 0;
+  color: #111827;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.input-group input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.field-error {
+  display: none;
+  margin-top: 7px;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.field-error.visible {
+  display: block;
+}
+
+.toggle-password {
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  margin-right: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 12px;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-password:hover {
+  background: #eaf2fb;
+}
+
+/* ==============================
+   BOTÓN
+============================== */
+
+.btn-login {
+  width: 100%;
+  height: 52px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition: 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
+}
+
+.btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.28);
+}
+
+.btn-login:disabled {
+  opacity: 0.78;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-loader {
+  display: none;
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.btn-login.loading .btn-loader {
+  display: inline-block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==============================
+   RECUPERAR
+============================== */
+
+.forgot-password {
+  margin: 18px 0 0 0;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
+.forgot-password a {
+  color: #2563eb;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 520px) {
+  .login-card {
+    padding: 26px 22px;
+    border-radius: 24px;
+  }
+
+  .login-logo {
+    width: 145px;
+  }
+
+  .login-brand h1 {
+    font-size: 1.7rem;
+  }
+}
+</style>
+
+<script>
+function togglePassword() {
+  const input = document.getElementById("password");
+  input.type = input.type === "password" ? "text" : "password";
+}
+
+function setInvalid(inputId, errorId, invalid) {
+  const input = document.getElementById(inputId);
+  const group = input.closest(".input-group");
+  const error = document.getElementById(errorId);
+
+  if (invalid) {
+    group.classList.add("invalid");
+    error.classList.add("visible");
+  } else {
+    group.classList.remove("invalid");
+    error.classList.remove("visible");
+  }
+}
+
+document.getElementById("username").addEventListener("input", function () {
+  this.value = this.value.trim().toLowerCase();
+  setInvalid("username", "usernameError", !this.value);
+});
+
+document.getElementById("password").addEventListener("input", function () {
+  setInvalid("password", "passwordError", !this.value.trim());
+});
+
+document.getElementById("loginForm").addEventListener("submit", function (event) {
+  const usernameInput = document.getElementById("username");
+  const passwordInput = document.getElementById("password");
+  const btn = document.getElementById("btnLogin");
+  const text = btn.querySelector(".btn-text");
+
+  usernameInput.value = usernameInput.value.trim().toLowerCase();
+  passwordInput.value = passwordInput.value.trim();
+
+  const usernameInvalid = !usernameInput.value;
+  const passwordInvalid = !passwordInput.value;
+
+  setInvalid("username", "usernameError", usernameInvalid);
+  setInvalid("password", "passwordError", passwordInvalid);
+
+  if (usernameInvalid || passwordInvalid) {
+    event.preventDefault();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.classList.add("loading");
+  text.textContent = "Ingresando...";
+});
+</script>
+
+{% endblock %}

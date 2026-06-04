@@ -1,0 +1,242 @@
+/* ====== Filtros ====== */
+.filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.filter-form input,
+.filter-form select {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-size: 14px;
+  min-width: 220px;
+}
+
+.filter-form button {
+  background: #28a745;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+.filter-form button:hover {
+  background: #218838;
+}
+
+/* ====== Botón Volver ====== */
+.btn-volver {
+  background: #6c757d;
+  color: #fff;
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 8px 14px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px; /* separación ícono-texto */
+}
+
+.btn-volver:hover {
+  background: #5a6268;
+  text-decoration: none;
+}
+
+/* ====== Header ====== */
+.facturas-page .header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.facturas-page h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #333;
+}
+
+/* ====== Tabla ====== */
+.table-wrapper {
+  margin-top: 15px;
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: #333;
+}
+
+.styled-table thead {
+  background: #007bff;
+  color: #fff;
+}
+
+.styled-table th,
+.styled-table td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Filas alternas en claro */
+.styled-table tbody tr:nth-child(odd) {
+  background: #fff;
+}
+.styled-table tbody tr:nth-child(even) {
+  background: #f9f9f9;
+}
+
+/* Hover */
+.styled-table tbody tr:hover {
+  background: #f1f5fb;
+  transition: background 0.3s ease;
+}
+
+/* ====== Badges de estado ====== */
+.badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.badge.pendiente {
+  background: #ffc107;
+  color: #000;
+}
+
+.badge.pagado {
+  background: #28a745;
+  color: #fff;
+}
+
+.badge.cancelado {
+  background: #dc3545;
+  color: #fff;
+}
+
+/* ====== Links de acciones ====== */
+.btn-link {
+  color: #007bff;
+  text-decoration: none;
+  margin: 0 5px;
+  font-weight: bold;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* ====== Paginación ====== */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #333;
+}
+
+.page-btn {
+  background: #007bff;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.3s;
+}
+
+.page-btn:hover {
+  background: #0056b3;
+}
+
+.pagination span {
+  color: #666;
+}
+
+/* ====== Responsive general ====== */
+@media (max-width: 992px) {
+  .facturas-page .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .facturas-page h1 {
+    font-size: 1.3rem;
+  }
+
+  .filter-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-form input,
+  .filter-form select,
+  .filter-form button {
+    width: 100%;
+  }
+}
+
+/* ====== Tabla en pantallas pequeñas ====== */
+@media (max-width: 768px) {
+  .styled-table thead {
+    display: none; /* Ocultamos cabecera */
+  }
+
+  .styled-table,
+  .styled-table tbody,
+  .styled-table tr,
+  .styled-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .styled-table tr {
+    margin-bottom: 15px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .styled-table td {
+    text-align: left;
+    padding: 8px 10px;
+    position: relative;
+  }
+
+  .styled-table td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #666;
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .page-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
