@@ -48,6 +48,138 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ================== POST: Crear primer usuario administrador ==================
+router.post("/bootstrap", async (req, res) => {
+  try {
+    const {
+      nombrecompleto,
+      username,
+      passwordhash,
+      email,
+      idempresa
+    } = req.body;
+
+    if (!nombrecompleto || !username || !passwordhash || !idempresa) {
+      return res.status(400).json({
+        success: false,
+        error: "Nombre completo, username, contraseña e idempresa son obligatorios"
+      });
+    }
+
+    const totalUsuariosResult = await query(`
+      SELECT COUNT(*)::int AS total
+      FROM usuarios
+    `);
+
+    const totalUsuarios = totalUsuariosResult.rows[0].total;
+
+    if (totalUsuarios > 0) {
+      return res.status(403).json({
+        success: false,
+        error: "Bootstrap deshabilitado. Ya existen usuarios en el sistema."
+      });
+    }
+
+    const empresaResult = await query(
+      `
+      SELECT idempresa
+      FROM empresas
+      WHERE idempresa = $1
+        AND activo = true
+      `,
+      [idempresa]
+    );
+
+    if (empresaResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "La empresa indicada no existe o está inactiva"
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(passwordhash, 10);
+
+    await query("BEGIN");
+
+    try {
+      const usuarioResult = await query(
+        `
+        INSERT INTO usuarios (
+          nombrecompleto,
+          username,
+          passwordhash,
+          rol,
+          email,
+          activo,
+          createdat,
+          updatedat
+        )
+        VALUES ($1, LOWER($2), $3, 'ADMIN', $4, true, NOW(), NOW())
+        RETURNING 
+          idusuario,
+          nombrecompleto,
+          username,
+          rol,
+          email,
+          activo,
+          createdat,
+          updatedat
+        `,
+        [
+          nombrecompleto,
+          username,
+          hashedPassword,
+          email || null
+        ]
+      );
+
+      const usuario = usuarioResult.rows[0];
+
+      const usuarioEmpresaResult = await query(
+        `
+        INSERT INTO usuario_empresa (
+          idusuario,
+          idempresa,
+          rol_empresa,
+          activo,
+          es_predeterminada,
+          createdat,
+          updatedat
+        )
+        VALUES ($1, $2, 'ADMIN', true, true, NOW(), NOW())
+        RETURNING *
+        `,
+        [
+          usuario.idusuario,
+          idempresa
+        ]
+      );
+
+      await query("COMMIT");
+
+      return res.status(201).json({
+        success: true,
+        mensaje: "Usuario administrador inicial creado correctamente",
+        usuario,
+        usuario_empresa: usuarioEmpresaResult.rows[0]
+      });
+
+    } catch (transactionError) {
+      await query("ROLLBACK");
+      throw transactionError;
+    }
+
+  } catch (error) {
+    console.error("❌ Error creando usuario bootstrap:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Error creando usuario bootstrap",
+      detalle: error.message
+    });
+  }
+});
+
 // ================== GET: Usuario por ID ==================
 router.get("/:id", async (req, res) => {
   try {
