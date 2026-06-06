@@ -47,7 +47,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
@@ -60,6 +60,11 @@ console.log("🌐 CORS habilitado para:", allowedOrigins.join(", "));
 // ✅ Públicas
 app.use("/api/auth", authRoutes);
 
+// ✅ Usuarios se monta SIN authJwt global
+// La ruta /api/usuarios/bootstrap queda pública.
+// Las demás rutas deben protegerse dentro de routes/usuarios.js con router.use(authJwt).
+app.use("/api/usuarios", usuariosRoutes);
+
 // ✅ Protegidas
 app.use("/api/productos", authJwt, productosRoutes);
 app.use("/api/clientes", authJwt, clientesRoutes);
@@ -68,21 +73,41 @@ app.use("/api/reservas", authJwt, reservasRoutes);
 app.use("/api/facturas", authJwt, facturasRoutes);
 app.use("/api/drive", authJwt, driveRoutes);
 app.use("/api/egresos", authJwt, egresosRoutes);
-app.use("/api/usuarios", authJwt, usuariosRoutes);
 app.use("/api/cierre-dia", authJwt, cierreDiaRoutes);
 app.use("/api/caja", authJwt, cajaRoutes);
 app.use("/api/energia", authJwt, energiaRoutes);
 app.use("/api/calendar-reservas", authJwt, calendarReservasRoutes);
 app.use("/api/paracaidistas-horas", authJwt, paracaidistasHorasRoutes);
-app.use("/api/vuelos-mes", informeVuelosMesRoutes);
-
-// Recomendado: proteger también coach si no es público
 app.use("/api/coach", authJwt, coachRoutes);
+
+// Revisa si este informe también debe ir protegido.
+// Lo dejo protegido para mantener seguridad.
+app.use("/api/vuelos-mes", authJwt, informeVuelosMesRoutes);
 
 // =================== RUTA DE PRUEBA ===================
 app.get("/", (req, res) => {
   res.json({
     status: "🚀 API Facturación funcionando correctamente",
+  });
+});
+
+// =================== RUTA 404 ===================
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: "Ruta no encontrada",
+    path: req.originalUrl,
+  });
+});
+
+// =================== MANEJO GENERAL DE ERRORES ===================
+app.use((err, req, res, next) => {
+  console.error("❌ Error no controlado:", err);
+
+  res.status(500).json({
+    success: false,
+    error: "Error interno del servidor",
+    detalle: err.message,
   });
 });
 

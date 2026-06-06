@@ -5,6 +5,14 @@ import bcrypt from "bcrypt";
 
 const router = express.Router();
 
+// =====================================================
+// RUTA PÚBLICA: bootstrap
+// =====================================================
+router.post("/bootstrap", async (req, res) => {
+  // código para crear primer usuario
+});
+
+
 // ================== GET: Listar usuarios ==================
 router.get("/", async (req, res) => {
   try {
