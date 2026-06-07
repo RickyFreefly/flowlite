@@ -1,0 +1,1278 @@
+{% extends "base.html" %}
+{% block title %}Administración de Medios de Pago{% endblock %}
+
+{% block content %}
+
+<div class="medios-page">
+
+  <!-- =========================
+       ENCABEZADO
+  ========================== -->
+  <section class="medios-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Administración de Medios de Pago</h1>
+      <p>
+        Gestiona los medios de pago disponibles para facturación, caja, pagos electrónicos y conciliación de la empresa activa.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-badge">
+      {{ empresa_nombre or 'Medios de pago' }}
+    </div>
+  </section>
+
+  <!-- =========================
+       KPIS
+  ========================== -->
+  <section class="kpi-grid">
+
+    <div class="kpi-card kpi-total">
+      <span>Total medios</span>
+      <strong>{{ total_medios or 0 }}</strong>
+      <small>Registros creados en la empresa activa</small>
+    </div>
+
+    <div class="kpi-card kpi-active">
+      <span>En uso</span>
+      <strong>{{ total_en_uso or 0 }}</strong>
+      <small>Disponibles para operación</small>
+    </div>
+
+    <div class="kpi-card kpi-inactive">
+      <span>Inactivos</span>
+      <strong>{{ total_inactivos or 0 }}</strong>
+      <small>No disponibles para uso</small>
+    </div>
+
+    <div class="kpi-card kpi-electronic">
+      <span>Electrónicos</span>
+      <strong>{{ total_electronicos or 0 }}</strong>
+      <small>Marcados como medio de pago electrónico</small>
+    </div>
+
+  </section>
+
+  <!-- =========================
+       FORMULARIO CREAR / EDITAR
+  ========================== -->
+  <section class="form-card">
+    <div class="section-heading">
+      <div>
+        {% if medio_editar %}
+          <h2>Editar medio de pago</h2>
+          <p>Actualiza la información contable y operativa del medio seleccionado.</p>
+        {% else %}
+          <h2>Crear medio de pago</h2>
+          <p>Registra medios como efectivo, transferencia, tarjeta, PSE u otros canales de recaudo.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if medio_editar %}
+      <form method="post"
+            action="{{ url_for('medios_pago.actualizar_medio_pago', id=medio_editar.idmedio) }}"
+            class="medio-form"
+            id="medioForm">
+    {% else %}
+      <form method="post"
+            action="{{ url_for('medios_pago.crear_medio_pago') }}"
+            class="medio-form"
+            id="medioForm">
+    {% endif %}
+
+      <div class="form-grid three-cols">
+
+        <div class="field field-wide">
+          <label for="nombre">Nombre</label>
+          <input type="text"
+                 id="nombre"
+                 name="nombre"
+                 value="{{ medio_editar.nombre if medio_editar else '' }}"
+                 placeholder="Ej: Efectivo, Transferencia, Tarjeta"
+                 autocomplete="off"
+                 required>
+          <small class="field-help">El nombre debe ser único dentro de la empresa activa.</small>
+        </div>
+
+        <div class="field">
+          <label for="relacionadocon">Relacionado con</label>
+          <input type="text"
+                 id="relacionadocon"
+                 name="relacionadocon"
+                 value="{{ medio_editar.relacionadocon if medio_editar else '' }}"
+                 placeholder="Ej: Caja, Banco, SIIGO"
+                 autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="cuentacontable">Cuenta contable</label>
+          <input type="text"
+                 id="cuentacontable"
+                 name="cuentacontable"
+                 value="{{ medio_editar.cuentacontable if medio_editar else '' }}"
+                 placeholder="Ej: 110505"
+                 autocomplete="off">
+        </div>
+
+      </div>
+
+      <div class="form-grid four-cols">
+
+        <div class="field">
+          <label for="mediopagoelectronico">Medio electrónico</label>
+          {% set electronico_actual_form = medio_editar.mediopagoelectronico if medio_editar else false %}
+          <select id="mediopagoelectronico" name="mediopagoelectronico">
+            <option value="false" {% if not electronico_actual_form %}selected{% endif %}>No</option>
+            <option value="true" {% if electronico_actual_form %}selected{% endif %}>Sí</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="enuso">Estado</label>
+          {% set enuso_actual_form = medio_editar.enuso if medio_editar else true %}
+          <select id="enuso" name="enuso">
+            <option value="true" {% if enuso_actual_form %}selected{% endif %}>En uso</option>
+            <option value="false" {% if not enuso_actual_form %}selected{% endif %}>Inactivo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="idsiigo">ID SIIGO</label>
+          <input type="text"
+                 id="idsiigo"
+                 name="idsiigo"
+                 value="{{ medio_editar.idsiigo if medio_editar else '' }}"
+                 placeholder="ID medio en SIIGO"
+                 autocomplete="off">
+        </div>
+
+        <div class="field field-info">
+          <label>Uso operativo</label>
+          <div class="info-box">
+            Los medios activos aparecerán disponibles en facturación y caja.
+          </div>
+        </div>
+
+      </div>
+
+      <div class="form-actions">
+        {% if medio_editar %}
+          <a href="{{ url_for('medios_pago.listar_medios_pago', page=page, limit=limit, buscar=buscar, enuso=enuso, relacionadocon=relacionadocon, electronico=electronico) }}"
+             class="btn btn-light">
+            Cancelar edición
+          </a>
+
+          <button type="submit" class="btn btn-primary" id="btnGuardarMedio">
+            Guardar cambios
+          </button>
+        {% else %}
+          <button type="button" class="btn btn-light" onclick="limpiarFormularioMedio()">
+            Limpiar
+          </button>
+
+          <button type="submit" class="btn btn-primary" id="btnGuardarMedio">
+            Crear medio de pago
+          </button>
+        {% endif %}
+      </div>
+
+    </form>
+  </section>
+
+  <!-- =========================
+       FILTROS
+  ========================== -->
+  <section class="filter-card">
+    <div class="section-heading compact">
+      <div>
+        <h2>Buscar medios de pago</h2>
+        <p>Consulta por nombre, relación, cuenta contable, estado o configuración electrónica.</p>
+      </div>
+    </div>
+
+    <form method="get"
+          action="{{ url_for('medios_pago.listar_medios_pago') }}"
+          class="filter-form">
+
+      <input type="hidden" name="page" value="1">
+
+      <div class="form-grid filter-grid">
+
+        <div class="field field-wide">
+          <label for="buscar">Buscar</label>
+          <input type="text"
+                 id="buscar"
+                 name="buscar"
+                 value="{{ buscar }}"
+                 placeholder="Nombre, relación, cuenta o ID SIIGO"
+                 autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="enuso_filtro">Estado</label>
+          <select id="enuso_filtro" name="enuso">
+            <option value="">Todos</option>
+            <option value="true" {% if enuso == 'true' %}selected{% endif %}>En uso</option>
+            <option value="false" {% if enuso == 'false' %}selected{% endif %}>Inactivo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="electronico_filtro">Electrónico</label>
+          <select id="electronico_filtro" name="electronico">
+            <option value="">Todos</option>
+            <option value="true" {% if electronico == 'true' %}selected{% endif %}>Sí</option>
+            <option value="false" {% if electronico == 'false' %}selected{% endif %}>No</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="limit">Mostrar</label>
+          <select id="limit" name="limit">
+            <option value="10" {% if limit == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if limit == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+          </select>
+        </div>
+
+        <div class="field action-field">
+          <button type="submit" class="btn btn-primary">
+            Buscar
+          </button>
+
+          <a href="{{ url_for('medios_pago.listar_medios_pago') }}" class="btn btn-light">
+            Limpiar
+          </a>
+        </div>
+
+      </div>
+
+    </form>
+  </section>
+
+  <!-- =========================
+       LISTADO
+  ========================== -->
+  <section class="list-card">
+
+    <div class="list-header">
+      <div>
+        <h2>Listado de medios de pago</h2>
+        <p>
+          {% if medios_pago %}
+            Página {{ page or 1 }} de {{ total_pages or 1 }}.
+            Total filtrado: {{ total or 0 }} medio(s).
+          {% else %}
+            No hay medios de pago para mostrar.
+          {% endif %}
+        </p>
+      </div>
+
+      {% if buscar or enuso or relacionadocon or electronico %}
+        <span class="filter-pill">
+          Filtros aplicados
+        </span>
+      {% endif %}
+    </div>
+
+    <div class="table-wrapper">
+      <table class="medios-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Relacionado con</th>
+            <th>Cuenta contable</th>
+            <th>Electrónico</th>
+            <th>Estado</th>
+            <th>ID SIIGO</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% if medios_pago %}
+            {% for medio in medios_pago %}
+              {% set medio_enuso = medio.enuso %}
+              {% set medio_electronico = medio.mediopagoelectronico %}
+
+              <tr>
+                <td data-label="ID">
+                  <span class="medio-id">#{{ medio.idmedio }}</span>
+                </td>
+
+                <td data-label="Nombre" class="medio-name">
+                  <strong>{{ medio.nombre or '-' }}</strong>
+                </td>
+
+                <td data-label="Relacionado con">
+                  {% if medio.relacionadocon %}
+                    <span class="type-pill">{{ medio.relacionadocon }}</span>
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+
+                <td data-label="Cuenta contable">
+                  {{ medio.cuentacontable or '-' }}
+                </td>
+
+                <td data-label="Electrónico">
+                  {% if medio_electronico %}
+                    <span class="status-badge status-electronico">Sí</span>
+                  {% else %}
+                    <span class="status-badge status-no-electronico">No</span>
+                  {% endif %}
+                </td>
+
+                <td data-label="Estado">
+                  {% if medio_enuso %}
+                    <span class="status-badge status-activo">En uso</span>
+                  {% else %}
+                    <span class="status-badge status-inactivo">Inactivo</span>
+                  {% endif %}
+                </td>
+
+                <td data-label="ID SIIGO">
+                  {% if medio.idsiigo %}
+                    <strong>{{ medio.idsiigo }}</strong>
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+
+                <td data-label="Acciones">
+                  <div class="row-actions">
+
+                    <a href="{{ url_for('medios_pago.listar_medios_pago', editar=medio.idmedio, page=page, limit=limit, buscar=buscar, enuso=enuso, relacionadocon=relacionadocon, electronico=electronico) }}"
+                       class="action-btn action-edit">
+                      Editar
+                    </a>
+
+                    <form method="post"
+                          action="{{ url_for('medios_pago.cambiar_estado_medio_pago', id=medio.idmedio) }}">
+                      <input type="hidden" name="enuso_actual" value="{{ 'true' if medio_enuso else 'false' }}">
+
+                      {% if medio_enuso %}
+                        <button type="submit" class="action-btn action-inactivate">
+                          Inactivar
+                        </button>
+                      {% else %}
+                        <button type="submit" class="action-btn action-activate">
+                          Activar
+                        </button>
+                      {% endif %}
+                    </form>
+
+                    <form method="post"
+                          action="{{ url_for('medios_pago.cambiar_electronico_medio_pago', id=medio.idmedio) }}">
+                      <input type="hidden" name="electronico_actual" value="{{ 'true' if medio_electronico else 'false' }}">
+
+                      {% if medio_electronico %}
+                        <button type="submit" class="action-btn action-neutral">
+                          No electrónico
+                        </button>
+                      {% else %}
+                        <button type="submit" class="action-btn action-electronic">
+                          Electrónico
+                        </button>
+                      {% endif %}
+                    </form>
+
+                    <form method="post"
+                          action="{{ url_for('medios_pago.eliminar_medio_pago', id=medio.idmedio) }}"
+                          onsubmit="return confirm('¿Seguro que deseas eliminar este medio de pago? Si ya tiene facturas, pagos o registros relacionados, se recomienda inactivarlo.');">
+                      <button type="submit" class="action-btn action-delete">
+                        Eliminar
+                      </button>
+                    </form>
+
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" class="empty-state">
+                <div class="empty-box">
+                  <strong>No hay medios de pago registrados</strong>
+                  <p>Crea un medio de pago desde el formulario superior o ajusta los filtros.</p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- =========================
+         PAGINACIÓN
+    ========================== -->
+    {% if total_pages and total_pages > 1 %}
+    <div class="pagination">
+
+      {% if page > 1 %}
+        <a href="{{ url_for('medios_pago.listar_medios_pago', page=page-1, limit=limit, buscar=buscar, enuso=enuso, relacionadocon=relacionadocon, electronico=electronico) }}"
+           class="page-btn">
+          ← Anterior
+        </a>
+      {% else %}
+        <span class="page-btn disabled">
+          ← Anterior
+        </span>
+      {% endif %}
+
+      <span class="page-info">
+        Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      </span>
+
+      {% if page < total_pages %}
+        <a href="{{ url_for('medios_pago.listar_medios_pago', page=page+1, limit=limit, buscar=buscar, enuso=enuso, relacionadocon=relacionadocon, electronico=electronico) }}"
+           class="page-btn">
+          Siguiente →
+        </a>
+      {% else %}
+        <span class="page-btn disabled">
+          Siguiente →
+        </span>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
+    <div class="note-box">
+      <strong>Criterio operativo:</strong>
+      usa <strong>Inactivar</strong> para medios de pago que ya hayan sido utilizados en facturas, caja o históricos.
+      Eliminar debe reservarse para registros creados por error y sin movimientos relacionados.
+    </div>
+
+  </section>
+
+</div>
+
+<!-- =========================
+     SCRIPT
+========================== -->
+<script>
+function limpiarFormularioMedio() {
+  const form = document.getElementById("medioForm");
+  if (!form) return;
+
+  form.reset();
+
+  const medioElectronico = document.getElementById("mediopagoelectronico");
+  const enuso = document.getElementById("enuso");
+
+  if (medioElectronico) medioElectronico.value = "false";
+  if (enuso) enuso.value = "true";
+
+  form.dataset.submitted = "false";
+
+  const btn = document.getElementById("btnGuardarMedio");
+  if (btn) {
+    btn.innerHTML = btn.dataset.originalText || "Crear medio de pago";
+    btn.disabled = false;
+    btn.classList.remove("btn-loading");
+  }
+}
+
+function limpiarTextoInput(id) {
+  const input = document.getElementById(id);
+  if (!input) return "";
+  input.value = input.value.trim();
+  return input.value;
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("medioForm");
+
+  if (!form) return;
+
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      return false;
+    }
+
+    const nombre = limpiarTextoInput("nombre");
+    limpiarTextoInput("relacionadocon");
+    limpiarTextoInput("cuentacontable");
+    limpiarTextoInput("idsiigo");
+
+    if (!nombre) {
+      event.preventDefault();
+      alert("El nombre del medio de pago es obligatorio.");
+      return false;
+    }
+
+    form.dataset.submitted = "true";
+
+    const btn = document.getElementById("btnGuardarMedio");
+    if (btn) {
+      btn.dataset.originalText = btn.innerHTML;
+      btn.innerHTML = "Guardando...";
+      btn.disabled = true;
+      btn.classList.add("btn-loading");
+    }
+
+    return true;
+  });
+});
+</script>
+
+<!-- =========================
+     ESTILOS
+========================== -->
+<style>
+.medios-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* =========================
+   HERO
+========================= */
+.medios-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.medios-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.medios-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 760px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-badge {
+  min-height: 38px;
+  max-width: 280px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================
+   KPI
+========================= */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.kpi-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--kpi-color, #2563eb);
+}
+
+.kpi-card span {
+  display: block;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.kpi-card strong {
+  display: block;
+  color: #111827;
+  font-size: 2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.kpi-card small {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.kpi-total {
+  --kpi-color: #2563eb;
+}
+
+.kpi-active {
+  --kpi-color: #16a34a;
+  background: #f0fbf4;
+}
+
+.kpi-inactive {
+  --kpi-color: #dc2626;
+  background: #fff5f5;
+}
+
+.kpi-electronic {
+  --kpi-color: #7c3aed;
+  background: #f5f3ff;
+}
+
+/* =========================
+   CARDS
+========================= */
+.form-card,
+.filter-card,
+.list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.section-heading.compact {
+  margin-bottom: 14px;
+}
+
+.section-heading h2,
+.list-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p,
+.list-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+/* =========================
+   FORM
+========================= */
+.form-grid {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.three-cols {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.four-cols {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.filter-grid {
+  grid-template-columns: 2fr 1fr 1fr 0.7fr auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.field input:focus,
+.field select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.field-info {
+  justify-content: flex-end;
+}
+
+.info-box {
+  min-height: 44px;
+  border: 1px solid #dbeafe;
+  border-radius: 13px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 10px 13px;
+  display: flex;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.25;
+  box-sizing: border-box;
+}
+
+.action-field {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: end;
+}
+
+.form-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.btn,
+.page-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================
+   TABLE
+========================= */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.medios-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1120px;
+}
+
+.medios-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.medios-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.medios-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.medios-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.medios-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.medios-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.medio-id {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 900;
+}
+
+.medio-name {
+  min-width: 220px;
+  max-width: 360px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.type-pill,
+.filter-pill {
+  display: inline-flex;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.status-badge {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-activo {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-inactivo {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.status-electronico {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.status-no-electronico {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.muted {
+  color: #94a3b8;
+}
+
+/* =========================
+   ROW ACTIONS
+========================= */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row-actions form {
+  margin: 0;
+}
+
+.action-btn {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 850;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  text-decoration: none;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.action-edit {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.action-edit:hover {
+  background: #fde68a;
+}
+
+.action-activate {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.action-activate:hover {
+  background: #bbf7d0;
+}
+
+.action-inactivate {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.action-inactivate:hover {
+  background: #fed7aa;
+}
+
+.action-electronic {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
+.action-electronic:hover {
+  background: #ddd6fe;
+}
+
+.action-neutral {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.action-neutral:hover {
+  background: #e2e8f0;
+}
+
+.action-delete {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.action-delete:hover {
+  background: #fecaca;
+}
+
+/* =========================
+   EMPTY
+========================= */
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* =========================
+   PAGINATION
+========================= */
+.pagination {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-info {
+  color: #64748b;
+  font-weight: 750;
+}
+
+.page-btn {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.page-btn:hover {
+  background: #e5e7eb;
+}
+
+.page-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.note-box {
+  margin-top: 18px;
+  background: #f8fafc;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  padding: 13px 15px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.note-box strong {
+  color: #111827;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+@media (max-width: 1080px) {
+  .kpi-grid,
+  .three-cols,
+  .four-cols,
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-field {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 760px) {
+  .medios-page {
+    padding: 22px 14px 38px;
+  }
+
+  .medios-hero,
+  .form-card,
+  .filter-card,
+  .list-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .medios-hero,
+  .list-header {
+    flex-direction: column;
+  }
+
+  .hero-badge {
+    max-width: 100%;
+    align-self: flex-start;
+  }
+
+  .form-actions,
+  .action-field {
+    flex-direction: column;
+  }
+
+  .btn,
+  .page-btn {
+    width: 100%;
+  }
+
+  .medios-table {
+    min-width: 0;
+  }
+
+  .medios-table thead {
+    display: none;
+  }
+
+  .medios-table,
+  .medios-table tbody,
+  .medios-table tr,
+  .medios-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .medios-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .medios-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .medios-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .medios-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .medio-name {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .row-actions {
+    justify-content: flex-end;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+</style>
+
+{% endblock %}

@@ -21,6 +21,7 @@ import calendarReservasRoutes from "./routes/calendarReservas.js";
 import paracaidistasHorasRoutes from "./routes/paracaidistasHoras.js";
 import coachRoutes from "./routes/coach.js";
 import informeVuelosMesRoutes from "./routes/informe_vuelos_mes.js";
+import empresasRoutes from "./routes/empresas.js";
 
 // ✅ Middleware JWT
 import { authJwt } from "./routes/authJwt.js";
@@ -47,8 +48,8 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-empresa-id"],
     credentials: true,
   })
 );
@@ -79,9 +80,9 @@ app.use("/api/energia", authJwt, energiaRoutes);
 app.use("/api/calendar-reservas", authJwt, calendarReservasRoutes);
 app.use("/api/paracaidistas-horas", authJwt, paracaidistasHorasRoutes);
 app.use("/api/coach", authJwt, coachRoutes);
+app.use("/api/empresas", empresasRoutes);
 
-// Revisa si este informe también debe ir protegido.
-// Lo dejo protegido para mantener seguridad.
+// ✅ Informe protegido
 app.use("/api/vuelos-mes", authJwt, informeVuelosMesRoutes);
 
 // =================== RUTA DE PRUEBA ===================

@@ -952,6 +952,78 @@ def imprimir_tirilla_factura(id):
         return validacion
 
     try:
+        # Factura
+        r = requests.get(
+            f"{config.API_URL}/facturas/{id}",
+            headers=get_headers(),
+            timeout=20
+        )
+
+        if r.status_code != 200:
+            redireccion = manejar_error_backend(r, "Factura no encontrada")
+            if redireccion:
+                return redireccion
+
+            return redirect(url_for("facturas.listar_facturas"))
+
+        factura = normalizar_factura_response(r.json())
+
+        # Empresa activa
+        empresa_logo_url = None
+        empresa_nombre_render = session.get("empresa_nombre")
+
+        r_empresa = requests.get(
+            f"{config.API_URL}/empresas/actual",
+            headers=get_headers(),
+            timeout=15
+        )
+
+        if r_empresa.status_code == 200:
+            empresa_data = r_empresa.json().get("empresa", {})
+
+            empresa_nombre_render = (
+                empresa_data.get("nombre")
+                or empresa_nombre_render
+            )
+
+            logo_ticket = empresa_data.get("logo_ticket_url")
+            logo_general = empresa_data.get("logo_url")
+
+            logo_db = logo_ticket or logo_general
+
+            if logo_db:
+                # Si es URL externa, se usa directa.
+                if logo_db.startswith("http://") or logo_db.startswith("https://"):
+                    empresa_logo_url = logo_db
+                else:
+                    # Si es ruta relativa dentro de static.
+                    empresa_logo_url = url_for("static", filename=logo_db)
+
+        return render_template(
+            "tirilla_factura.html",
+            factura=factura,
+            empresa_actual=session.get("empresa_actual"),
+            empresa_nombre=empresa_nombre_render,
+            empresa_logo_url=empresa_logo_url,
+            username=session.get("username"),
+            datetime=datetime,
+        )
+
+    except requests.exceptions.Timeout:
+        flash("El backend tardó demasiado en responder.", "danger")
+
+    except requests.exceptions.ConnectionError:
+        flash("No fue posible conectar con el backend.", "danger")
+
+    except Exception as e:
+        flash(f"Error generando tirilla: {e}", "danger")
+
+    return redirect(url_for("facturas.listar_facturas"))
+    validacion = validar_sesion_empresa()
+    if validacion:
+        return validacion
+
+    try:
         r = requests.get(
             f"{config.API_URL}/facturas/{id}",
             headers=get_headers(),

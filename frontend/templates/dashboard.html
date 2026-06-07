@@ -19,9 +19,17 @@
   ========================== -->
   <header class="dashboard-topbar">
     <div class="brand-block">
-      <img src="{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
-           alt="FlowLite"
-           class="brand-logo">
+
+      <!-- 
+        Logo del top bar:
+        - Si la empresa tiene logo_url en BD, Flask envía empresa_logo_url.
+        - Si no tiene logo, se usa el logo actual de FlowLite.
+        - Si la imagen falla, vuelve al logo de FlowLite.
+      -->
+      <img src="{{ empresa_logo_url or url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
+           alt="{{ empresa_nombre or 'FlowLite' }}"
+           class="brand-logo"
+           onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}';">
 
       <div class="brand-text">
         <h1>Bienvenido, <span>{{ username }}</span></h1>
@@ -63,7 +71,7 @@
         <div class="section-header">
           <div>
             <h2>Operación</h2>
-            <p>Gestión diaria de clientes, reservas, productos, facturación y egresos.</p>
+            <p>Gestión diaria de clientes, productos, facturación y egresos.</p>
           </div>
         </div>
 
@@ -74,15 +82,6 @@
             <div class="module-content">
               <h3>Clientes</h3>
               <p>Consulta, creación y actualización de clientes por empresa.</p>
-            </div>
-            <span class="module-arrow">→</span>
-          </a>
-
-          <a href="{{ url_for('reservas.listar_reservas') }}" class="module-card module-card-cyan">
-            <div class="module-icon">📅</div>
-            <div class="module-content">
-              <h3>Reservas</h3>
-              <p>Control de reservas, horarios y disponibilidad.</p>
             </div>
             <span class="module-arrow">→</span>
           </a>
@@ -110,15 +109,6 @@
             <div class="module-content">
               <h3>Egresos</h3>
               <p>Registro de gastos, pagos y salidas de dinero.</p>
-            </div>
-            <span class="module-arrow">→</span>
-          </a>
-
-          <a href="{{ url_for('caja.listar_caja') }}" class="module-card module-card-purple">
-            <div class="module-icon">💰</div>
-            <div class="module-content">
-              <h3>Caja</h3>
-              <p>Registro y control de movimientos de caja.</p>
             </div>
             <span class="module-arrow">→</span>
           </a>
@@ -157,15 +147,6 @@
             <span class="module-arrow">→</span>
           </a>
 
-          <a href="{{ url_for('calendar.calendar_view') }}" class="module-card module-card-orange">
-            <div class="module-icon">🗓️</div>
-            <div class="module-content">
-              <h3>Calendario</h3>
-              <p>Visualiza reservas y actividades programadas.</p>
-            </div>
-            <span class="module-arrow">→</span>
-          </a>
-
         </div>
       </section>
 
@@ -187,6 +168,15 @@
             <div class="module-content">
               <h3>Usuarios</h3>
               <p>Administra usuarios y accesos del sistema.</p>
+            </div>
+            <span class="module-arrow">→</span>
+          </a>
+
+          <a href="{{ url_for('medios_pago.listar_medios_pago') }}" class="module-card module-card-payments">
+            <div class="module-icon">💳</div>
+            <div class="module-content">
+              <h3>Medios de pago</h3>
+              <p>Administra efectivo, transferencias, tarjetas, medios electrónicos y cuentas contables.</p>
             </div>
             <span class="module-arrow">→</span>
           </a>
@@ -265,7 +255,9 @@
 .brand-logo {
   width: 150px;
   max-width: 100%;
+  max-height: 86px;
   object-fit: contain;
+  display: block;
 }
 
 .brand-text h1 {
@@ -533,12 +525,6 @@
   --card-border: #bfdbfe;
 }
 
-.module-card-cyan {
-  --card-color: #0891b2;
-  --card-soft: #cffafe;
-  --card-border: #a5f3fc;
-}
-
 .module-card-products {
   --card-color: #9333ea;
   --card-soft: #f3e8ff;
@@ -557,12 +543,6 @@
   --card-border: #fecaca;
 }
 
-.module-card-purple {
-  --card-color: #7c3aed;
-  --card-soft: #ede9fe;
-  --card-border: #ddd6fe;
-}
-
 .module-card-teal {
   --card-color: #0f766e;
   --card-soft: #ccfbf1;
@@ -575,16 +555,16 @@
   --card-border: #c7d2fe;
 }
 
-.module-card-orange {
-  --card-color: #ea580c;
-  --card-soft: #ffedd5;
-  --card-border: #fed7aa;
-}
-
 .module-card-dark {
   --card-color: #0f172a;
   --card-soft: #e2e8f0;
   --card-border: #cbd5e1;
+}
+
+.module-card-payments {
+  --card-color: #0d9488;
+  --card-soft: #ccfbf1;
+  --card-border: #99f6e4;
 }
 
 /* ==============================
@@ -623,6 +603,7 @@
 
   .brand-logo {
     width: 130px;
+    max-height: 76px;
   }
 
   .user-actions {

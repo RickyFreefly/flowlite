@@ -31,10 +31,21 @@
       margin: 0 auto;
     }
 
-    .center { text-align: center; }
-    .right { text-align: right; }
-    .bold { font-weight: 700; }
-    .small { font-size: 9px; }
+    .center {
+      text-align: center;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .bold {
+      font-weight: 700;
+    }
+
+    .small {
+      font-size: 9px;
+    }
 
     .logo-box {
       text-align: center;
@@ -54,6 +65,7 @@
       font-weight: 800;
       text-transform: uppercase;
       margin-bottom: 1mm;
+      word-break: break-word;
     }
 
     .subtitle {
@@ -141,18 +153,14 @@
 
   <div class="ticket">
 
-    {# 
-      Por ahora usa logo fijo desde static.
-      Más adelante este mismo punto puede recibir logo desde BD:
-      empresa_logo_url.
-    #}
-    {% set logo_url = empresa_logo_url if empresa_logo_url else url_for('static', filename='img/logo_trocitos_grill.png') %}
-
     <!-- ENCABEZADO -->
     <div class="center">
-      <div class="logo-box">
-        <img src="{{ logo_url }}" alt="Logo empresa">
-      </div>
+
+      {% if empresa_logo_url %}
+        <div class="logo-box">
+          <img src="{{ empresa_logo_url }}" alt="Logo empresa">
+        </div>
+      {% endif %}
 
       <div class="empresa-nombre">
         {{ empresa_nombre or "FlowLite" }}
@@ -205,25 +213,29 @@
     <!-- DETALLE -->
     <div class="bold">DETALLE</div>
 
-    {% for d in factura.detalles %}
-      <div class="item">
-        <div class="item-name">
-          {{ d.nombre or d.descripcion or "Producto" }}
-        </div>
+    {% if factura.detalles %}
+      {% for d in factura.detalles %}
+        <div class="item">
+          <div class="item-name">
+            {{ d.nombre or d.descripcion or "Producto" }}
+          </div>
 
-        <div class="item-detail">
-          <span>
-            {{ "{:,.0f}".format(d.cantidad|float).replace(",", ".") }}
-            x
-            ${{ "{:,.0f}".format(d.valorunitario|float).replace(",", ".") }}
-          </span>
+          <div class="item-detail">
+            <span>
+              {{ "{:,.0f}".format(d.cantidad|float).replace(",", ".") }}
+              x
+              ${{ "{:,.0f}".format(d.valorunitario|float).replace(",", ".") }}
+            </span>
 
-          <span>
-            ${{ "{:,.0f}".format(d.subtotal|float).replace(",", ".") }}
-          </span>
+            <span>
+              ${{ "{:,.0f}".format(d.subtotal|float).replace(",", ".") }}
+            </span>
+          </div>
         </div>
-      </div>
-    {% endfor %}
+      {% endfor %}
+    {% else %}
+      <div class="small">Sin productos registrados.</div>
+    {% endif %}
 
     <div class="line"></div>
 
@@ -238,12 +250,16 @@
 
     <div class="row">
       <span class="label">Pagado:</span>
-      <span class="value">${{ "{:,.0f}".format(total_pagado|float).replace(",", ".") }}</span>
+      <span class="value">
+        ${{ "{:,.0f}".format(total_pagado|float).replace(",", ".") }}
+      </span>
     </div>
 
     <div class="row">
       <span class="label">Saldo:</span>
-      <span class="value">${{ "{:,.0f}".format(saldo|float).replace(",", ".") }}</span>
+      <span class="value">
+        ${{ "{:,.0f}".format(saldo|float).replace(",", ".") }}
+      </span>
     </div>
 
     <div class="line"></div>
@@ -255,7 +271,9 @@
       {% for p in factura.pagos %}
         <div class="row">
           <span class="label">{{ p.medio or p.idmedio or "Medio" }}</span>
-          <span class="value">${{ "{:,.0f}".format(p.valor|float).replace(",", ".") }}</span>
+          <span class="value">
+            ${{ "{:,.0f}".format(p.valor|float).replace(",", ".") }}
+          </span>
         </div>
       {% endfor %}
     {% else %}
