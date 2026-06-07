@@ -1,0 +1,1030 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Cuenta Abierta{% endblock %}
+
+{% block content %}
+
+<div class="cuenta-detalle-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="detalle-hero">
+    <div>
+      <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="back-link">
+        ← Volver a Cuentas Abiertas
+      </a>
+
+      <h1>Detalle de Cuenta Abierta</h1>
+
+      <p>
+        Consulta el saldo actual, estado de la cuenta e historial completo de cargos, abonos y ajustes.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-actions">
+      {% if cuenta and cuenta.estado == "ABIERTA" %}
+        <a href="{{ url_for('cuentas_abiertas.formulario_abono', idcuenta=cuenta.idcuenta) }}" class="btn btn-primary">
+          💵 Registrar Abono
+        </a>
+
+        <a href="{{ url_for('cuentas_abiertas.formulario_ajuste', idcuenta=cuenta.idcuenta) }}" class="btn btn-light">
+          ✏️ Ajustar
+        </a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if cuenta %}
+
+  {% set estado_cuenta = cuenta.estado or 'SIN_ESTADO' %}
+  {% set estado_class = estado_cuenta|lower|replace(' ', '-')|replace('_', '-') %}
+  {% set saldo_actual = cuenta.saldo_actual|float if cuenta.saldo_actual else 0 %}
+
+  <!-- ==============================
+       RESUMEN
+  =============================== -->
+  <section class="summary-grid">
+
+    <article class="summary-card summary-main">
+      <span class="summary-label">Saldo actual</span>
+      <strong class="{% if saldo_actual > 0 %}money-pending{% else %}money-zero{% endif %}">
+        ${{ "{:,.0f}".format(saldo_actual).replace(",", ".") }}
+      </strong>
+      <small>
+        {% if saldo_actual > 0 %}
+          Saldo pendiente por pagar.
+        {% else %}
+          Cuenta sin saldo pendiente.
+        {% endif %}
+      </small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Estado</span>
+      <div class="summary-badge-wrapper">
+        <span class="status-badge status-{{ estado_class }}">
+          {{ estado_cuenta }}
+        </span>
+      </div>
+      <small>Estado actual de la cuenta.</small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Movimientos</span>
+      <strong>{{ movimientos|length if movimientos else 0 }}</strong>
+      <small>Cargos, abonos y ajustes registrados.</small>
+    </article>
+
+  </section>
+
+  <!-- ==============================
+       DATOS DEL CLIENTE / CUENTA
+  =============================== -->
+  <section class="detail-grid">
+
+    <article class="detail-card">
+      <div class="detail-header">
+        <h2>Cliente</h2>
+        <p>Información asociada a la cuenta.</p>
+      </div>
+
+      <div class="info-list">
+
+        <div class="info-row">
+          <span>Nombre</span>
+          <strong>
+            {{ cuenta.nombre_cliente or cliente.nombre_cliente if cliente is defined and cliente else cuenta.nombre_cliente or 'Cliente sin nombre' }}
+          </strong>
+        </div>
+
+        <div class="info-row">
+          <span>Identificación</span>
+          <strong>{{ cuenta.identificacion or cliente.identificacion if cliente is defined and cliente else cuenta.identificacion or '—' }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>ID Cliente</span>
+          <strong>{{ cuenta.idcliente or '—' }}</strong>
+        </div>
+
+      </div>
+    </article>
+
+    <article class="detail-card">
+      <div class="detail-header">
+        <h2>Cuenta</h2>
+        <p>Fechas y datos administrativos.</p>
+      </div>
+
+      <div class="info-list">
+
+        <div class="info-row">
+          <span>ID Cuenta</span>
+          <strong>#{{ cuenta.idcuenta }}</strong>
+        </div>
+
+        <div class="info-row">
+          <span>Fecha apertura</span>
+          <strong>
+            {% if cuenta.fecha_apertura %}
+              {{ cuenta.fecha_apertura[:10] }}
+            {% elif cuenta.createdat %}
+              {{ cuenta.createdat[:10] }}
+            {% else %}
+              —
+            {% endif %}
+          </strong>
+        </div>
+
+        <div class="info-row">
+          <span>Fecha cierre</span>
+          <strong>
+            {% if cuenta.fecha_cierre %}
+              {{ cuenta.fecha_cierre[:10] }}
+            {% else %}
+              —
+            {% endif %}
+          </strong>
+        </div>
+
+      </div>
+    </article>
+
+  </section>
+
+  <!-- ==============================
+       ACCIONES SECUNDARIAS
+  =============================== -->
+  {% if cuenta.estado == "ABIERTA" and saldo_actual == 0 %}
+  <section class="action-panel">
+    <div>
+      <h2>Cierre disponible</h2>
+      <p>La cuenta tiene saldo cero. Puedes cerrarla manualmente.</p>
+    </div>
+
+    <form
+      method="post"
+      action="{{ url_for('cuentas_abiertas.cerrar_cuenta', idcuenta=cuenta.idcuenta) }}"
+      class="inline-form form-cerrar-cuenta"
+    >
+      <button
+        type="button"
+        class="btn btn-success btn-submit-cierre"
+        data-loading-text="⏳ Cerrando..."
+      >
+        ✅ Cerrar cuenta
+      </button>
+    </form>
+  </section>
+  {% endif %}
+
+  <!-- ==============================
+       HISTORIAL
+  =============================== -->
+  <section class="list-card">
+
+    <div class="list-header">
+      <div>
+        <h2>Historial de movimientos</h2>
+        <p>
+          Registro cronológico de cargos, abonos y ajustes realizados sobre la cuenta.
+        </p>
+      </div>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="movimientos-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+            <th>Saldo anterior</th>
+            <th>Saldo nuevo</th>
+            <th>Medio</th>
+            <th>Factura</th>
+            <th>Observación</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for m in movimientos %}
+          {% set tipo_mov = m.tipo_movimiento or 'SIN_TIPO' %}
+          {% set tipo_class = tipo_mov|lower|replace(' ', '-')|replace('_', '-') %}
+
+          <tr>
+            <td data-label="Fecha">
+              {% if m.createdat %}
+                {{ m.createdat[:10] }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Tipo">
+              <span class="movement-badge movement-{{ tipo_class }}">
+                {{ tipo_mov }}
+              </span>
+            </td>
+
+            <td data-label="Valor">
+              <strong class="money">
+                ${{ "{:,.0f}".format(m.valor|float).replace(",", ".") if m.valor else "0" }}
+              </strong>
+            </td>
+
+            <td data-label="Saldo anterior">
+              ${{ "{:,.0f}".format(m.saldo_anterior|float).replace(",", ".") if m.saldo_anterior else "0" }}
+            </td>
+
+            <td data-label="Saldo nuevo">
+              <strong>
+                ${{ "{:,.0f}".format(m.saldo_nuevo|float).replace(",", ".") if m.saldo_nuevo else "0" }}
+              </strong>
+            </td>
+
+            <td data-label="Medio">
+              {% if m.medio_pago %}
+                {{ m.medio_pago }}
+              {% elif m.idmedio_pago %}
+                {{ m.idmedio_pago }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Factura">
+              {% if m.idfactura %}
+                {% if m.public_url %}
+                  <a href="{{ m.public_url }}" target="_blank" rel="noopener noreferrer" class="factura-link">
+                    #{{ m.idfactura }}
+                  </a>
+                {% else %}
+                  #{{ m.idfactura }}
+                {% endif %}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Observación">
+              {% if m.observacion %}
+                <span class="observacion-text">{{ m.observacion }}</span>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="8" class="empty-state">
+              <div class="empty-box">
+                <strong>Sin movimientos registrados</strong>
+                <p>Esta cuenta todavía no tiene historial de cargos, abonos o ajustes.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+  {% else %}
+
+  <!-- ==============================
+       SIN CUENTA
+  =============================== -->
+  <section class="empty-detail">
+    <div class="empty-box">
+      <strong>No existe cuenta abierta para este cliente</strong>
+      <p>El cliente no tiene saldos pendientes registrados actualmente.</p>
+
+      <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="btn btn-primary">
+        Volver al listado
+      </a>
+    </div>
+  </section>
+
+  {% endif %}
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /*
+    BLOQUEO GLOBAL DE ENTER
+    Evita cierres accidentales de formularios por teclado.
+  */
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+
+  /*
+    BLOQUEO DE SUBMIT DIRECTO
+  */
+  const forms = document.querySelectorAll("form");
+
+  forms.forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+
+      if (form.dataset.allowSubmit !== "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      form.dataset.submitted = "true";
+
+      bloquearBotonesFormulario(form);
+
+      return true;
+    });
+  });
+
+
+  /*
+    CIERRE DE CUENTA
+  */
+  const botonesCierre = document.querySelectorAll(".btn-submit-cierre");
+
+  botonesCierre.forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const form = button.closest("form");
+
+      if (!form) {
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        return false;
+      }
+
+      const confirmado = confirm("¿Confirmas que deseas cerrar esta cuenta?");
+
+      if (!confirmado) {
+        return false;
+      }
+
+      form.dataset.allowSubmit = "true";
+
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+
+      return true;
+    });
+  });
+
+
+  function bloquearBotonesFormulario(form) {
+    const submitButtons = form.querySelectorAll(
+      "button, input[type='submit']"
+    );
+
+    submitButtons.forEach(function (button) {
+      const loadingText = button.dataset.loadingText || "⏳ Procesando...";
+
+      if (button.tagName.toLowerCase() === "button") {
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = loadingText;
+      } else {
+        button.dataset.originalText = button.value;
+        button.value = loadingText;
+      }
+
+      button.disabled = true;
+      button.classList.add("btn-loading");
+    });
+  }
+
+});
+</script>
+
+<style>
+/* ==============================
+   CUENTA ABIERTA DETALLE
+============================== */
+
+.cuenta-detalle-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   HERO
+============================== */
+
+.detalle-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.detalle-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.detalle-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ==============================
+   BUTTONS
+============================== */
+
+.btn,
+.action-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-success {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+}
+
+.btn-success:hover {
+  background: #15803d;
+}
+
+/* ==============================
+   SUMMARY
+============================== */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: clamp(1.7rem, 2.4vw, 2.2rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-weight: 650;
+}
+
+.summary-label {
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-main {
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border-color: #bfdbfe;
+}
+
+.summary-badge-wrapper {
+  margin-top: 14px;
+}
+
+/* ==============================
+   DETAIL CARDS
+============================== */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.detail-card,
+.list-card,
+.action-panel,
+.empty-detail {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.detail-header,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.detail-header h2,
+.list-header h2,
+.action-panel h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.detail-header p,
+.list-header p,
+.action-panel p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #edf2f7;
+}
+
+.info-row {
+  min-height: 48px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.info-row span {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.info-row strong {
+  color: #111827;
+  text-align: right;
+  font-weight: 900;
+}
+
+/* ==============================
+   ACTION PANEL
+============================== */
+
+.action-panel {
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+}
+
+/* ==============================
+   TABLE
+============================== */
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.movimientos-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1120px;
+}
+
+.movimientos-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.movimientos-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.movimientos-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.movimientos-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: top;
+}
+
+.movimientos-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.movimientos-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.money {
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.money-pending {
+  color: #b45309 !important;
+}
+
+.money-zero {
+  color: #166534 !important;
+}
+
+.muted {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.factura-link {
+  color: #2563eb;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.factura-link:hover {
+  text-decoration: underline;
+}
+
+.observacion-text {
+  display: block;
+  max-width: 360px;
+  color: #334155;
+  line-height: 1.4;
+}
+
+/* ==============================
+   STATUS BADGES
+============================== */
+
+.status-badge {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-abierta {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-cerrada {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-sin-estado {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* ==============================
+   MOVEMENT BADGES
+============================== */
+
+.movement-badge {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.movement-cargo {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.movement-abono {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.movement-ajuste {
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+.movement-sin-tipo {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+/* ==============================
+   EMPTY
+============================== */
+
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-detail {
+  text-align: center;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0 0 18px;
+  color: #64748b;
+}
+
+/* ==============================
+   LOADING
+============================== */
+
+.btn-loading,
+button:disabled,
+input[type="submit"]:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 1080px) {
+  .summary-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .detalle-hero,
+  .action-panel {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .cuenta-detalle-page {
+    padding: 22px 14px 38px;
+  }
+
+  .detalle-hero,
+  .detail-card,
+  .list-card,
+  .summary-card,
+  .action-panel,
+  .empty-detail {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .hero-actions,
+  .hero-actions .btn,
+  .action-panel .btn {
+    width: 100%;
+  }
+
+  .info-row {
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .info-row strong {
+    text-align: left;
+  }
+
+  .movimientos-table {
+    min-width: 0;
+  }
+
+  .movimientos-table thead {
+    display: none;
+  }
+
+  .movimientos-table,
+  .movimientos-table tbody,
+  .movimientos-table tr,
+  .movimientos-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .movimientos-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .movimientos-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .movimientos-table tbody td:last-child {
+    border-bottom: none;
+    display: block;
+    text-align: left;
+  }
+
+  .movimientos-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .movimientos-table tbody td:last-child::before {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .observacion-text {
+    max-width: none;
+  }
+}
+</style>
+
+{% endblock %}

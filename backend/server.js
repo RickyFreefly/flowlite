@@ -22,6 +22,7 @@ import paracaidistasHorasRoutes from "./routes/paracaidistasHoras.js";
 import coachRoutes from "./routes/coach.js";
 import informeVuelosMesRoutes from "./routes/informe_vuelos_mes.js";
 import empresasRoutes from "./routes/empresas.js";
+import cuentasAbiertasRoutes from "./routes/cuentas_abiertas.js";
 
 // ✅ Middleware JWT
 import { authJwt } from "./routes/authJwt.js";
@@ -81,6 +82,7 @@ app.use("/api/calendar-reservas", authJwt, calendarReservasRoutes);
 app.use("/api/paracaidistas-horas", authJwt, paracaidistasHorasRoutes);
 app.use("/api/coach", authJwt, coachRoutes);
 app.use("/api/empresas", empresasRoutes);
+app.use("/api/cuentas-abiertas", cuentasAbiertasRoutes);
 
 // ✅ Informe protegido
 app.use("/api/vuelos-mes", authJwt, informeVuelosMesRoutes);

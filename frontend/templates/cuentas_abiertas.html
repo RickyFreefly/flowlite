@@ -1,0 +1,1581 @@
+{% extends "base.html" %}
+
+{% block title %}Cuentas Abiertas{% endblock %}
+
+{% block content %}
+
+<div class="cuentas-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="cuentas-hero">
+    <div>
+      <a href="{{ url_for('dashboard.index') }}" class="back-link">
+        ← Volver al Dashboard
+      </a>
+
+      <h1>Cuentas Abiertas</h1>
+      <p>
+        Consulta la cartera por cliente, revisa saldos pendientes, registra abonos y controla las cuentas fiadas de la empresa activa.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-actions">
+<a href="{{ url_for('cuentas_abiertas.formulario_consumo') }}" class="btn btn-primary">
+  ➕ Registrar Consumo
+</a>
+
+      <a href="{{ url_for('facturas.crear_factura_form') }}" class="btn btn-light">
+        Nueva Factura
+      </a>
+    </div>
+  </section>
+
+  <!-- ==============================
+       RESUMEN
+  =============================== -->
+  <section class="summary-grid">
+
+    <article class="summary-card summary-main">
+      <span class="summary-label">Total cartera abierta</span>
+      <strong>
+        ${{ "{:,.0f}".format(resumen.total_cartera|float).replace(",", ".") if resumen and resumen.total_cartera else "0" }}
+      </strong>
+      <small>Saldo pendiente acumulado en cuentas activas.</small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Cuentas abiertas</span>
+      <strong>{{ resumen.cuentas_abiertas if resumen else 0 }}</strong>
+      <small>Clientes con saldo pendiente.</small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Cuentas cerradas</span>
+      <strong>{{ resumen.cuentas_cerradas if resumen else 0 }}</strong>
+      <small>Cuentas finalizadas con saldo cero.</small>
+    </article>
+
+  </section>
+
+  <!-- ==============================
+       NUEVA CUENTA ABIERTA
+  =============================== -->
+  <section class="create-card" id="nueva-cuenta">
+
+    <div class="create-header">
+      <div>
+        <h2>Nueva cuenta abierta</h2>
+        <p>
+          Busca un cliente y registra el cargo inicial de la cuenta. Si el cliente ya tiene una cuenta abierta, el valor se sumará al saldo actual.
+        </p>
+      </div>
+    </div>
+
+    <form
+      method="post"
+      action="{{ url_for('cuentas_abiertas.registrar_cargo_manual') }}"
+      class="create-form"
+      id="formNuevaCuenta"
+      novalidate
+    >
+
+      <input type="hidden" name="idcliente" id="idclienteNuevaCuenta">
+
+      <div class="create-grid">
+
+        <div class="field">
+          <label for="identificacionCliente">Identificación del cliente</label>
+          <div class="search-inline">
+            <input
+              id="identificacionCliente"
+              type="text"
+              placeholder="Ej: 1024511113"
+              autocomplete="off"
+            >
+
+            <button type="button" class="btn btn-primary" id="btnBuscarCliente">
+              🔍 Buscar
+            </button>
+          </div>
+          <small class="field-help">Primero busca y selecciona el cliente.</small>
+        </div>
+
+        <div class="field">
+          <label for="valorCargo">Valor inicial</label>
+          <input
+            id="valorCargo"
+            name="valor"
+            type="number"
+            min="1"
+            step="1"
+            placeholder="Ej: 50000"
+            autocomplete="off"
+            required
+          >
+          <small class="field-help">Este valor aumentará el saldo pendiente del cliente.</small>
+        </div>
+
+      </div>
+
+      <div class="selected-client-box" id="selectedClientBox" style="display:none;">
+        <div>
+          <span>Cliente seleccionado</span>
+          <strong id="selectedClientName">—</strong>
+          <small id="selectedClientDoc">—</small>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="observacionCargo">Observación</label>
+        <textarea
+          id="observacionCargo"
+          name="observacion"
+          rows="3"
+          placeholder="Ej: Apertura de cuenta fiada"
+        >Apertura de cuenta abierta desde Flow Lite</textarea>
+      </div>
+
+      <div class="validation-message" id="createValidationMessage" style="display:none;"></div>
+
+      <div class="create-actions">
+        <button
+          type="button"
+          class="btn btn-primary"
+          id="btnCrearCuenta"
+          data-loading-text="⏳ Creando..."
+        >
+          💳 Crear Cuenta / Registrar Cargo
+        </button>
+      </div>
+
+    </form>
+
+  </section>
+
+  <!-- ==============================
+       FILTROS
+  =============================== -->
+  <section class="filter-card">
+    <div class="filter-header">
+      <div>
+        <h2>Filtros de búsqueda</h2>
+        <p>Busca cuentas por cliente, estado o cantidad de registros por página.</p>
+      </div>
+    </div>
+
+    <form method="get"
+          action="{{ url_for('cuentas_abiertas.listar_cuentas') }}"
+          class="filter-form">
+
+      <input type="hidden" name="page" value="1">
+
+      <div class="field">
+        <label for="cliente">Cliente</label>
+        <input
+          id="cliente"
+          type="text"
+          name="cliente"
+          placeholder="Buscar por nombre o identificación"
+          value="{{ cliente or request.args.get('cliente','') }}"
+          autocomplete="off"
+        >
+      </div>
+
+      <div class="field">
+        <label for="estado">Estado</label>
+        {% set estado_actual = estado or request.args.get('estado','') %}
+        <select id="estado" name="estado">
+          <option value="">Todos los estados</option>
+          <option value="ABIERTA" {% if estado_actual == 'ABIERTA' %}selected{% endif %}>
+            Abierta
+          </option>
+          <option value="CERRADA" {% if estado_actual == 'CERRADA' %}selected{% endif %}>
+            Cerrada
+          </option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="per_page">Mostrar</label>
+        {% set per_page_actual = per_page or request.args.get('per_page', 10)|int %}
+        <select id="per_page" name="per_page">
+          <option value="10" {% if per_page_actual == 10 %}selected{% endif %}>10</option>
+          <option value="25" {% if per_page_actual == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if per_page_actual == 50 %}selected{% endif %}>50</option>
+          <option value="100" {% if per_page_actual == 100 %}selected{% endif %}>100</option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button
+          type="submit"
+          class="btn btn-primary"
+          data-loading-text="🔎 Buscando..."
+        >
+          🔍 Buscar
+        </button>
+
+        <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="btn btn-light">
+          Limpiar
+        </a>
+      </div>
+
+    </form>
+  </section>
+
+  <!-- ==============================
+       LISTADO
+  =============================== -->
+  <section class="list-card">
+
+    <div class="list-header">
+      <div>
+        <h2>Listado de cuentas</h2>
+        <p>
+          Página {{ page }} de {{ total_pages }}.
+          {% if total is defined %}
+            Total filtrado: {{ total }} registro(s).
+          {% elif cuentas %}
+            Mostrando {{ cuentas|length }} registro(s).
+          {% else %}
+            No hay registros para mostrar.
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="active-filters">
+        {% if cliente or request.args.get('cliente') %}
+          <span class="filter-pill">
+            Cliente: {{ cliente or request.args.get('cliente') }}
+          </span>
+        {% endif %}
+
+        {% if estado_actual %}
+          <span class="filter-pill">
+            Estado: {{ estado_actual }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ==============================
+         TABLA
+    =============================== -->
+    <div class="table-wrapper">
+      <table class="cuentas-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Saldo</th>
+            <th>Estado</th>
+            <th>Apertura</th>
+            <th>Último movimiento</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for c in cuentas %}
+          {% set estado_cuenta = c.estado or 'SIN_ESTADO' %}
+          {% set estado_class = estado_cuenta|lower|replace(' ', '-')|replace('_', '-') %}
+          {% set saldo = c.saldo_actual|float if c.saldo_actual else 0 %}
+
+          <tr>
+            <td data-label="ID">
+              <span class="account-id">#{{ c.idcuenta }}</span>
+            </td>
+
+            <td data-label="Cliente">
+              <div class="client-cell">
+                <strong>{{ c.nombre_cliente or 'Cliente sin nombre' }}</strong>
+                {% if c.identificacion %}
+                  <small>{{ c.identificacion }}</small>
+                {% endif %}
+              </div>
+            </td>
+
+            <td data-label="Saldo">
+              <strong class="money {% if saldo > 0 %}money-pending{% else %}money-zero{% endif %}">
+                ${{ "{:,.0f}".format(saldo).replace(",", ".") }}
+              </strong>
+            </td>
+
+            <td data-label="Estado">
+              <span class="status-badge status-{{ estado_class }}">
+                {{ estado_cuenta }}
+              </span>
+            </td>
+
+            <td data-label="Apertura">
+              {% if c.fecha_apertura %}
+                {{ c.fecha_apertura[:10] }}
+              {% elif c.createdat %}
+                {{ c.createdat[:10] }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Último movimiento">
+              {% if c.ultimo_movimiento %}
+                {{ c.ultimo_movimiento[:10] }}
+              {% elif c.updatedat %}
+                {{ c.updatedat[:10] }}
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+
+            <td data-label="Acciones">
+              <div class="actions-cell">
+
+                <a
+                  href="{{ url_for('cuentas_abiertas.detalle_cuenta', idcuenta=c.idcuenta) }}"
+                  class="action-btn action-view"
+                >
+                  🔍 Ver
+                </a>
+
+                {% if c.estado == "ABIERTA" %}
+                  <a
+                    href="{{ url_for('cuentas_abiertas.formulario_abono', idcuenta=c.idcuenta) }}"
+                    class="action-btn action-pay"
+                  >
+                    💵 Abonar
+                  </a>
+
+                  <a
+                    href="{{ url_for('cuentas_abiertas.formulario_ajuste', idcuenta=c.idcuenta) }}"
+                    class="action-btn action-edit"
+                  >
+                    ✏️ Ajustar
+                  </a>
+                {% endif %}
+
+                {% if c.estado == "ABIERTA" and saldo == 0 %}
+                  <form
+                    method="post"
+                    action="{{ url_for('cuentas_abiertas.cerrar_cuenta', idcuenta=c.idcuenta) }}"
+                    class="inline-form form-cerrar-cuenta"
+                  >
+                    <button
+                      type="button"
+                      class="action-btn action-close btn-submit-cierre"
+                      data-loading-text="⏳ Cerrando..."
+                    >
+                      ✅ Cerrar
+                    </button>
+                  </form>
+                {% endif %}
+
+              </div>
+            </td>
+          </tr>
+
+          {% else %}
+          <tr>
+            <td colspan="7" class="empty-state">
+              <div class="empty-box">
+                <strong>No se encontraron cuentas abiertas</strong>
+                <p>Prueba limpiando los filtros o registra una cuenta abierta con cargo inicial.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ==============================
+         PAGINACIÓN
+    =============================== -->
+    {% if total_pages and total_pages > 1 %}
+    <div class="pagination">
+
+      <div class="pagination-info">
+        Página <strong>{{ page }}</strong> de <strong>{{ total_pages }}</strong>
+      </div>
+
+      <div class="pagination-actions">
+
+        {% if page > 1 %}
+          <a
+            href="{{ url_for(
+              'cuentas_abiertas.listar_cuentas',
+              page=page-1,
+              per_page=per_page_actual,
+              cliente=cliente or request.args.get('cliente',''),
+              estado=estado_actual
+            ) }}"
+            class="page-btn"
+          >
+            ← Anterior
+          </a>
+        {% else %}
+          <span class="page-btn disabled">← Anterior</span>
+        {% endif %}
+
+        {% if page < total_pages %}
+          <a
+            href="{{ url_for(
+              'cuentas_abiertas.listar_cuentas',
+              page=page+1,
+              per_page=per_page_actual,
+              cliente=cliente or request.args.get('cliente',''),
+              estado=estado_actual
+            ) }}"
+            class="page-btn"
+          >
+            Siguiente →
+          </a>
+        {% else %}
+          <span class="page-btn disabled">Siguiente →</span>
+        {% endif %}
+
+      </div>
+
+    </div>
+    {% endif %}
+
+  </section>
+
+</div>
+
+<!-- ✅ Control robusto de Enter + bloqueo contra doble clic / doble envío -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  /*
+    BLOQUEO GLOBAL DE ENTER
+    Evita que Enter dispare:
+    - envío del formulario de filtros
+    - creación accidental de cuentas
+    - cierre accidental de cuentas
+    - activación de botones enfocados
+  */
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+
+  /*
+    BLOQUEO DE SUBMIT DIRECTO
+    Si el navegador intenta enviar un formulario por Enter,
+    queda bloqueado.
+  */
+  const forms = document.querySelectorAll("form");
+
+  forms.forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+
+      if (form.dataset.allowSubmit !== "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      }
+
+      form.dataset.submitted = "true";
+
+      bloquearBotonesFormulario(form);
+
+      return true;
+    });
+  });
+
+
+  /*
+    FORMULARIO DE FILTROS
+    El botón Buscar solo envía con clic real.
+  */
+  const filterForm = document.querySelector(".filter-form");
+
+  if (filterForm) {
+    const buscarBtn = filterForm.querySelector("button[type='submit']");
+
+    if (buscarBtn) {
+      buscarBtn.setAttribute("type", "button");
+
+      buscarBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+
+        if (filterForm.dataset.submitted === "true") {
+          return false;
+        }
+
+        filterForm.dataset.allowSubmit = "true";
+
+        if (typeof filterForm.requestSubmit === "function") {
+          filterForm.requestSubmit();
+        } else {
+          filterForm.submit();
+        }
+      });
+    }
+  }
+
+
+  /*
+    NUEVA CUENTA ABIERTA
+    Busca cliente por identificación y registra cargo inicial.
+  */
+  const formNuevaCuenta = document.getElementById("formNuevaCuenta");
+  const identificacionCliente = document.getElementById("identificacionCliente");
+  const idclienteNuevaCuenta = document.getElementById("idclienteNuevaCuenta");
+  const valorCargo = document.getElementById("valorCargo");
+  const btnBuscarCliente = document.getElementById("btnBuscarCliente");
+  const btnCrearCuenta = document.getElementById("btnCrearCuenta");
+  const selectedClientBox = document.getElementById("selectedClientBox");
+  const selectedClientName = document.getElementById("selectedClientName");
+  const selectedClientDoc = document.getElementById("selectedClientDoc");
+  const createValidationMessage = document.getElementById("createValidationMessage");
+
+  if (btnBuscarCliente) {
+    btnBuscarCliente.addEventListener("click", async function (event) {
+      event.preventDefault();
+
+      const identificacion = identificacionCliente.value.trim();
+
+      if (!identificacion) {
+        mostrarErrorNuevaCuenta("Debes ingresar la identificación del cliente.");
+        identificacionCliente.focus();
+        return;
+      }
+
+      limpiarClienteSeleccionado();
+      ocultarErrorNuevaCuenta();
+
+      btnBuscarCliente.disabled = true;
+      btnBuscarCliente.innerHTML = "⏳ Buscando...";
+
+      try {
+        const response = await fetch(
+          "{{ url_for('facturas.proxy_buscar_cliente') }}?identificacion=" + encodeURIComponent(identificacion),
+          {
+            method: "GET",
+            headers: {
+              "Accept": "application/json"
+            }
+          }
+        );
+
+        const data = await response.json();
+
+        let cliente = null;
+
+        if (Array.isArray(data) && data.length > 0) {
+          cliente = data[0];
+        } else if (data && typeof data === "object") {
+          if (Array.isArray(data.clientes) && data.clientes.length > 0) {
+            cliente = data.clientes[0];
+          } else if (Array.isArray(data.data) && data.data.length > 0) {
+            cliente = data.data[0];
+          } else if (data.idcliente) {
+            cliente = data;
+          }
+        }
+
+        if (!cliente || !cliente.idcliente) {
+          mostrarErrorNuevaCuenta("No se encontró un cliente con esa identificación.");
+          return;
+        }
+
+        const nombreCliente =
+          cliente.razonsocial ||
+          cliente.nombre_cliente ||
+          `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim() ||
+          "Cliente sin nombre";
+
+        idclienteNuevaCuenta.value = cliente.idcliente;
+        selectedClientName.textContent = nombreCliente;
+        selectedClientDoc.textContent = cliente.identificacion || identificacion;
+        selectedClientBox.style.display = "block";
+
+        ocultarErrorNuevaCuenta();
+
+      } catch (error) {
+        console.error("Error buscando cliente:", error);
+        mostrarErrorNuevaCuenta("No fue posible buscar el cliente.");
+      } finally {
+        btnBuscarCliente.disabled = false;
+        btnBuscarCliente.innerHTML = "🔍 Buscar";
+      }
+    });
+  }
+
+  if (btnCrearCuenta && formNuevaCuenta) {
+    btnCrearCuenta.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (formNuevaCuenta.dataset.submitted === "true") {
+        return false;
+      }
+
+      const idcliente = idclienteNuevaCuenta.value.trim();
+      const valor = Number(valorCargo.value || 0);
+
+      if (!idcliente) {
+        mostrarErrorNuevaCuenta("Primero debes buscar y seleccionar un cliente.");
+        identificacionCliente.focus();
+        return false;
+      }
+
+      if (valor <= 0) {
+        mostrarErrorNuevaCuenta("El valor inicial debe ser mayor a cero.");
+        valorCargo.focus();
+        return false;
+      }
+
+      const confirmado = confirm("¿Confirmas que deseas crear o aumentar la cuenta abierta de este cliente?");
+
+      if (!confirmado) {
+        return false;
+      }
+
+      formNuevaCuenta.dataset.allowSubmit = "true";
+
+      if (typeof formNuevaCuenta.requestSubmit === "function") {
+        formNuevaCuenta.requestSubmit();
+      } else {
+        formNuevaCuenta.submit();
+      }
+
+      return true;
+    });
+  }
+
+  function mostrarErrorNuevaCuenta(mensaje) {
+    if (!createValidationMessage) return;
+
+    createValidationMessage.textContent = mensaje;
+    createValidationMessage.style.display = "block";
+  }
+
+  function ocultarErrorNuevaCuenta() {
+    if (!createValidationMessage) return;
+
+    createValidationMessage.textContent = "";
+    createValidationMessage.style.display = "none";
+  }
+
+  function limpiarClienteSeleccionado() {
+    if (idclienteNuevaCuenta) idclienteNuevaCuenta.value = "";
+    if (selectedClientName) selectedClientName.textContent = "—";
+    if (selectedClientDoc) selectedClientDoc.textContent = "—";
+    if (selectedClientBox) selectedClientBox.style.display = "none";
+  }
+
+
+  /*
+    CIERRE DE CUENTAS
+    El botón cerrar solo funciona con clic y confirmación.
+  */
+  const botonesCierre = document.querySelectorAll(".btn-submit-cierre");
+
+  botonesCierre.forEach(function (button) {
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const form = button.closest("form");
+
+      if (!form) {
+        return false;
+      }
+
+      if (form.dataset.submitted === "true") {
+        return false;
+      }
+
+      const confirmado = confirm("¿Confirmas que deseas cerrar esta cuenta?");
+
+      if (!confirmado) {
+        return false;
+      }
+
+      form.dataset.allowSubmit = "true";
+
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+
+      return true;
+    });
+  });
+
+
+  /*
+    Función reutilizable para bloquear botones
+    después de un envío válido.
+  */
+  function bloquearBotonesFormulario(form) {
+    const submitButtons = form.querySelectorAll(
+      "button, input[type='submit']"
+    );
+
+    submitButtons.forEach(function (button) {
+      const loadingText = button.dataset.loadingText || "⏳ Procesando...";
+
+      if (button.tagName.toLowerCase() === "button") {
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = loadingText;
+      } else {
+        button.dataset.originalText = button.value;
+        button.value = loadingText;
+      }
+
+      button.disabled = true;
+      button.classList.add("btn-loading");
+    });
+  }
+
+});
+</script>
+
+<style>
+/* ==============================
+   CUENTAS ABIERTAS PAGE
+============================== */
+
+.cuentas-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   HERO
+============================== */
+
+.cuentas-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.cuentas-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.cuentas-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ==============================
+   BUTTONS
+============================== */
+
+.btn,
+.page-btn,
+.action-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+/* ==============================
+   SUMMARY
+============================== */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: clamp(1.7rem, 2.4vw, 2.2rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-weight: 650;
+}
+
+.summary-label {
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-main {
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border-color: #bfdbfe;
+}
+
+/* ==============================
+   CREATE ACCOUNT
+============================== */
+
+.create-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.create-header {
+  margin-bottom: 18px;
+}
+
+.create-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.create-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.create-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 0.7fr;
+  gap: 14px;
+}
+
+.search-inline {
+  display: flex;
+  gap: 10px;
+}
+
+.search-inline input {
+  flex: 1;
+}
+
+.field textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 13px 14px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  resize: vertical;
+  min-height: 92px;
+  font-family: inherit;
+  transition: 0.2s ease;
+}
+
+.field textarea:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.selected-client-box {
+  padding: 15px 16px;
+  border-radius: 18px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.selected-client-box span {
+  display: block;
+  color: #047857;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selected-client-box strong {
+  display: block;
+  margin-top: 4px;
+  color: #064e3b;
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.selected-client-box small {
+  display: block;
+  margin-top: 3px;
+  color: #047857;
+  font-weight: 750;
+}
+
+.validation-message {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.create-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ==============================
+   FILTERS
+============================== */
+
+.filter-card,
+.list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.filter-card {
+  margin-bottom: 22px;
+}
+
+.filter-header,
+.list-header {
+  margin-bottom: 18px;
+}
+
+.filter-header h2,
+.list-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.filter-header p,
+.list-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filter-pill {
+  display: inline-flex;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: 1.5fr 240px 130px auto;
+  gap: 14px;
+  align-items: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select {
+  height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.field input:focus,
+.field select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ==============================
+   TABLE
+============================== */
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cuentas-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1040px;
+}
+
+.cuentas-table thead th {
+  background: #0f7ef7;
+  color: #fff;
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.cuentas-table thead th:first-child {
+  border-top-left-radius: 14px;
+}
+
+.cuentas-table thead th:last-child {
+  border-top-right-radius: 14px;
+}
+
+.cuentas-table tbody td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #edf2f7;
+  color: #111827;
+  vertical-align: middle;
+}
+
+.cuentas-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.cuentas-table tbody tr:hover {
+  background: #f3f8ff;
+}
+
+.account-id {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 900;
+}
+
+.client-cell strong {
+  display: block;
+  font-weight: 850;
+  color: #111827;
+}
+
+.client-cell small {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.money {
+  color: #0f172a;
+  font-weight: 950;
+}
+
+.money-pending {
+  color: #b45309;
+}
+
+.money-zero {
+  color: #166534;
+}
+
+.muted {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* ==============================
+   STATUS BADGES
+============================== */
+
+.status-badge {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-abierta {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-cerrada {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-sin-estado {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* ==============================
+   ACTIONS
+============================== */
+
+.actions-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+}
+
+button.action-btn {
+  font-family: inherit;
+}
+
+.action-view {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.action-view:hover {
+  background: #dbeafe;
+}
+
+.action-pay {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.action-pay:hover {
+  background: #d1fae5;
+}
+
+.action-edit {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.action-edit:hover {
+  background: #fed7aa;
+}
+
+.action-close {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.action-close:hover {
+  background: #dcfce7;
+}
+
+/* ==============================
+   EMPTY
+============================== */
+
+.empty-state {
+  text-align: center;
+  padding: 28px !important;
+}
+
+.empty-box strong {
+  display: block;
+  color: #111827;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.empty-box p {
+  margin: 0;
+  color: #64748b;
+}
+
+/* ==============================
+   PAGINATION
+============================== */
+
+.pagination {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #edf2f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-info {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.pagination-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.page-btn {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.page-btn:hover {
+  background: #e5e7eb;
+}
+
+.page-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ==============================
+   LOADING
+============================== */
+
+.btn-loading,
+button:disabled,
+input[type="submit"]:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 1080px) {
+  .filter-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .create-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .cuentas-hero,
+  .list-header {
+    flex-direction: column;
+  }
+
+  .active-filters {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .cuentas-page {
+    padding: 22px 14px 38px;
+  }
+
+  .cuentas-hero,
+  .filter-card,
+  .list-card,
+  .summary-card,
+  .create-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .filter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions,
+  .hero-actions .btn,
+  .filter-actions,
+  .filter-actions .btn,
+  .create-actions,
+  .create-actions .btn {
+    width: 100%;
+  }
+
+  .hero-actions,
+  .filter-actions {
+    flex-direction: column;
+  }
+
+  .search-inline {
+    flex-direction: column;
+  }
+
+  .search-inline .btn {
+    width: 100%;
+  }
+
+  .cuentas-table {
+    min-width: 0;
+  }
+
+  .cuentas-table thead {
+    display: none;
+  }
+
+  .cuentas-table,
+  .cuentas-table tbody,
+  .cuentas-table tr,
+  .cuentas-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .cuentas-table tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    margin-bottom: 14px;
+    padding: 10px;
+  }
+
+  .cuentas-table tbody td {
+    border-bottom: 1px solid #edf2f7;
+    padding: 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    text-align: right;
+  }
+
+  .cuentas-table tbody td:last-child {
+    border-bottom: none;
+    display: block;
+    text-align: left;
+  }
+
+  .cuentas-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 850;
+    text-align: left;
+  }
+
+  .cuentas-table tbody td:last-child::before {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .actions-cell {
+    justify-content: flex-start;
+  }
+
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination-actions {
+    width: 100%;
+  }
+
+  .page-btn {
+    flex: 1;
+  }
+}
+</style>
+
+{% endblock %}

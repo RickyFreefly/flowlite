@@ -1,0 +1,1410 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Consumo{% endblock %}
+
+{% block content %}
+
+<div class="consumo-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="consumo-hero">
+    <div>
+      <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="back-link">
+        ← Volver a Cuentas Abiertas
+      </a>
+
+      <h1>Registrar Consumo</h1>
+
+      <p>
+        Agrega productos o servicios consumidos por un cliente. El sistema acumulará el detalle en su cuenta abierta.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-actions">
+      <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="btn btn-light">
+        Ver Cuentas
+      </a>
+    </div>
+  </section>
+
+  <!-- ==============================
+       FORMULARIO
+  =============================== -->
+  <form
+    method="post"
+    action="{{ url_for('cuentas_abiertas.registrar_consumo') }}"
+    class="consumo-form"
+    id="consumoForm"
+    novalidate
+  >
+
+    <input
+      type="hidden"
+      id="idcliente"
+      name="idcliente"
+      value="{{ cliente.idcliente if cliente else '' }}"
+    >
+
+    <!-- ==============================
+         CLIENTE
+    =============================== -->
+    <section class="form-card">
+
+      <div class="section-heading">
+        <div>
+          <h2>Cliente</h2>
+          <p>Busca el cliente por identificación antes de registrar consumos.</p>
+        </div>
+      </div>
+
+      <div class="search-row">
+        <div class="field">
+          <label for="buscarIdentificacion">Identificación del cliente</label>
+          <input
+            type="text"
+            id="buscarIdentificacion"
+            placeholder="Digite la identificación"
+            value="{{ identificacion or (cliente.identificacion if cliente else '') }}"
+            autocomplete="off"
+          >
+        </div>
+
+        <button type="button" class="btn btn-light" id="btnBuscarCliente">
+          🔍 Buscar cliente
+        </button>
+      </div>
+
+      <div id="cliente-info" class="info-box {% if cliente %}success{% endif %}">
+        {% if cliente %}
+          <div>
+            <span class="info-label">Nombre</span>
+            <strong>
+              {{ cliente.razonsocial or ((cliente.nombres or '') ~ ' ' ~ (cliente.apellidos or '')) }}
+            </strong>
+          </div>
+
+          <div>
+            <span class="info-label">Identificación</span>
+            <strong>{{ cliente.identificacion or 'N/A' }}</strong>
+          </div>
+
+          <div>
+            <span class="info-label">Cuenta actual</span>
+            <strong>
+              {% if cuenta %}
+                #{{ cuenta.idcuenta }} · {{ cuenta.estado }}
+              {% else %}
+                Se creará automáticamente
+              {% endif %}
+            </strong>
+          </div>
+
+          <div>
+            <span class="info-label">Saldo actual</span>
+            <strong>
+              {% if cuenta %}
+                ${{ "{:,.0f}".format(cuenta.saldo_actual|float).replace(",", ".") }}
+              {% else %}
+                $0
+              {% endif %}
+            </strong>
+          </div>
+        {% else %}
+          <p class="muted">Busca un cliente por identificación para continuar.</p>
+        {% endif %}
+      </div>
+
+    </section>
+
+    <!-- ==============================
+         DATOS GENERALES
+    =============================== -->
+    <section class="form-card">
+
+      <div class="section-heading">
+        <div>
+          <h2>Datos del consumo</h2>
+          <p>Define la fecha y una observación general para este consumo.</p>
+        </div>
+      </div>
+
+      <div class="form-grid">
+
+        <div class="field">
+          <label for="fecha_consumo">Fecha de consumo</label>
+          <input
+            type="date"
+            id="fecha_consumo"
+            name="fecha_consumo"
+            value="{{ datetime.now().strftime('%Y-%m-%d') }}"
+            required
+          >
+        </div>
+
+        <div class="field">
+          <label for="observacion">Observación</label>
+          <input
+            type="text"
+            id="observacion"
+            name="observacion"
+            value="Consumo registrado desde Flow Lite"
+            placeholder="Ej: Consumo del día"
+          >
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- ==============================
+         PRODUCTOS / SERVICIOS
+    =============================== -->
+    <section class="form-card">
+
+      <div class="section-heading section-between">
+        <div>
+          <h2>Productos / servicios consumidos</h2>
+          <p>Agrega los productos que el cliente va cargando a su cuenta abierta.</p>
+        </div>
+
+        <button type="button" class="btn btn-light" id="btnAgregarDetalle">
+          ➕ Agregar detalle
+        </button>
+      </div>
+
+      <div class="detail-header">
+        <span>Buscar</span>
+        <span>Producto</span>
+        <span>Cantidad</span>
+        <span>Valor</span>
+        <span></span>
+      </div>
+
+      <div id="detalles" class="dynamic-list"></div>
+
+      <div class="empty-detail" id="emptyDetalle">
+        <strong>Sin productos agregados</strong>
+        <p>Agrega al menos un producto o servicio para registrar el consumo.</p>
+      </div>
+
+    </section>
+
+    <!-- ==============================
+         ABONOS OPCIONALES
+    =============================== -->
+    <section class="form-card">
+
+      <div class="section-heading section-between">
+        <div>
+          <h2>Pago o abono opcional</h2>
+          <p>Registra un pago parcial si el cliente abona algo al momento del consumo.</p>
+        </div>
+
+        <button type="button" class="btn btn-light" id="btnAgregarPago">
+          ➕ Agregar pago
+        </button>
+      </div>
+
+      <div class="payment-header">
+        <span>Medio</span>
+        <span>Valor</span>
+        <span>Observación</span>
+        <span></span>
+      </div>
+
+      <div id="pagos" class="dynamic-list"></div>
+
+      <div class="empty-detail" id="emptyPago">
+        <strong>Sin pagos agregados</strong>
+        <p>Si no registra pago, todo el consumo quedará como saldo pendiente.</p>
+      </div>
+
+    </section>
+
+    <!-- ==============================
+         TOTALES
+    =============================== -->
+    <section class="totals-panel">
+
+      <div class="total-card total-blue">
+        <span>Total consumo</span>
+        <strong id="totalConsumo">0.00</strong>
+      </div>
+
+      <div class="total-card total-green">
+        <span>Total abonado</span>
+        <strong id="totalPagado">0.00</strong>
+      </div>
+
+      <div class="total-card total-red" id="saldoCard">
+        <span>Saldo que irá a cuenta</span>
+        <strong id="saldoPendiente">0.00</strong>
+      </div>
+
+    </section>
+
+    <div class="validation-message" id="validationMessage" style="display:none;"></div>
+
+    <!-- ==============================
+         ACCIONES
+    =============================== -->
+    <section class="form-actions-sticky">
+
+      <div class="actions-note">
+        El consumo se acumulará por cliente y quedará visible en el detalle mensual de la cuenta.
+      </div>
+
+      <div class="actions-buttons">
+        <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="btn btn-light">
+          Cancelar
+        </a>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          id="btnGuardarConsumo"
+          data-loading-text="⏳ Registrando..."
+        >
+          💳 Registrar Consumo
+        </button>
+      </div>
+
+    </section>
+
+  </form>
+
+</div>
+
+<!-- ==============================
+     SCRIPTS
+=============================== -->
+<script>
+let productos = {{ productos|tojson }};
+let medios = {{ medios|tojson }};
+
+let detalleIndex = 0;
+let pagoIndex = 0;
+
+document.addEventListener("DOMContentLoaded", function () {
+  const btnBuscarCliente = document.getElementById("btnBuscarCliente");
+  const btnAgregarDetalle = document.getElementById("btnAgregarDetalle");
+  const btnAgregarPago = document.getElementById("btnAgregarPago");
+  const btnGuardarConsumo = document.getElementById("btnGuardarConsumo");
+  const form = document.getElementById("consumoForm");
+
+  btnBuscarCliente.addEventListener("click", buscarCliente);
+  btnAgregarDetalle.addEventListener("click", addDetalle);
+  btnAgregarPago.addEventListener("click", addPago);
+  btnGuardarConsumo.addEventListener("click", enviarConsumo);
+
+  /*
+    Bloquear Enter para evitar envíos accidentales.
+  */
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+  /*
+    Bloqueo de submit directo.
+  */
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.allowSubmit !== "true") {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
+
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
+
+    form.dataset.submitted = "true";
+    bloquearBotonesFormulario(form);
+
+    return true;
+  });
+
+  addDetalle();
+  actualizarTotales();
+});
+
+
+function normalizarNumero(valor) {
+  if (valor === null || valor === undefined) return 0;
+
+  let texto = String(valor).trim();
+
+  if (texto.includes(",") && texto.includes(".")) {
+    texto = texto.replace(/\./g, "").replace(",", ".");
+  } else {
+    texto = texto.replace(/,/g, ".");
+  }
+
+  texto = texto.replace(/[^0-9.-]/g, "");
+
+  const numero = parseFloat(texto);
+  return isNaN(numero) ? 0 : numero;
+}
+
+
+function formatoMoneda(valor) {
+  const numero = Number(valor || 0);
+
+  return numero.toLocaleString("es-CO", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+
+async function buscarCliente() {
+  const identificacionInput = document.getElementById("buscarIdentificacion");
+  const identificacion = identificacionInput.value.trim();
+  const clienteInfo = document.getElementById("cliente-info");
+  const idclienteInput = document.getElementById("idcliente");
+  const btnBuscarCliente = document.getElementById("btnBuscarCliente");
+
+  if (!identificacion) {
+    mostrarError("Ingresa una identificación primero.");
+    identificacionInput.focus();
+    return;
+  }
+
+  ocultarError();
+
+  btnBuscarCliente.disabled = true;
+  btnBuscarCliente.innerHTML = "⏳ Buscando...";
+
+  try {
+    const resp = await fetch(
+      "{{ url_for('facturas.proxy_buscar_cliente') }}?identificacion=" + encodeURIComponent(identificacion),
+      {
+        method: "GET",
+        headers: {
+          "Accept": "application/json"
+        }
+      }
+    );
+
+    if (!resp.ok) {
+      mostrarError("Error consultando el cliente.");
+      return;
+    }
+
+    const data = await resp.json();
+
+    let cliente = null;
+
+    if (Array.isArray(data) && data.length > 0) {
+      cliente = data[0];
+    } else if (data && typeof data === "object") {
+      if (Array.isArray(data.clientes) && data.clientes.length > 0) {
+        cliente = data.clientes[0];
+      } else if (Array.isArray(data.data) && data.data.length > 0) {
+        cliente = data.data[0];
+      } else if (data.idcliente) {
+        cliente = data;
+      }
+    }
+
+    if (!cliente || !cliente.idcliente) {
+      idclienteInput.value = "";
+      clienteInfo.classList.remove("success");
+      clienteInfo.innerHTML = `
+        <p style="color:#b91c1c; font-weight:800;">Cliente no encontrado</p>
+      `;
+      mostrarError("No se encontró un cliente con esa identificación.");
+      return;
+    }
+
+    const nombre = cliente.razonsocial ||
+      cliente.nombre_cliente ||
+      `${cliente.nombres || ""} ${cliente.apellidos || ""}`.trim() ||
+      "Cliente sin nombre";
+
+    idclienteInput.value = cliente.idcliente;
+
+    clienteInfo.classList.add("success");
+    clienteInfo.innerHTML = `
+      <div>
+        <span class="info-label">Nombre</span>
+        <strong>${nombre}</strong>
+      </div>
+      <div>
+        <span class="info-label">Identificación</span>
+        <strong>${cliente.identificacion || identificacion}</strong>
+      </div>
+      <div>
+        <span class="info-label">Cuenta actual</span>
+        <strong id="cuentaClienteLabel">Consultando...</strong>
+      </div>
+      <div>
+        <span class="info-label">Saldo actual</span>
+        <strong id="saldoClienteLabel">Consultando...</strong>
+      </div>
+    `;
+
+    await consultarCuentaCliente(cliente.idcliente);
+
+  } catch (error) {
+    console.error("Error buscando cliente:", error);
+    mostrarError("Error consultando el servidor.");
+  } finally {
+    btnBuscarCliente.disabled = false;
+    btnBuscarCliente.innerHTML = "🔍 Buscar cliente";
+  }
+}
+
+
+async function consultarCuentaCliente(idcliente) {
+  const cuentaLabel = document.getElementById("cuentaClienteLabel");
+  const saldoLabel = document.getElementById("saldoClienteLabel");
+
+  try {
+    const resp = await fetch("{{ url_for('cuentas_abiertas.proxy_cuenta_cliente', idcliente=0) }}".replace("/0", "/" + encodeURIComponent(idcliente)), {
+      method: "GET",
+      headers: {
+        "Accept": "application/json"
+      }
+    });
+
+    const data = await resp.json();
+
+    if (data && data.cuenta) {
+      cuentaLabel.textContent = "#" + data.cuenta.idcuenta + " · " + data.cuenta.estado;
+      saldoLabel.textContent = "$" + Number(data.cuenta.saldo_actual || 0).toLocaleString("es-CO", {
+        maximumFractionDigits: 0
+      });
+    } else {
+      cuentaLabel.textContent = "Se creará automáticamente";
+      saldoLabel.textContent = "$0";
+    }
+
+  } catch (error) {
+    console.error("Error consultando cuenta:", error);
+
+    if (cuentaLabel) cuentaLabel.textContent = "No disponible";
+    if (saldoLabel) saldoLabel.textContent = "No disponible";
+  }
+}
+
+
+function addDetalle() {
+  const detallesDiv = document.getElementById("detalles");
+  const emptyDetalle = document.getElementById("emptyDetalle");
+
+  const div = document.createElement("div");
+  div.classList.add("detalle-row");
+  div.setAttribute("id", `detalle_${detalleIndex}`);
+
+  let options = '<option value="">Selecciona producto</option>';
+
+  productos.forEach(p => {
+    const codigo = p.codigo || p.idproducto;
+    const nombre = p.nombre || p.descripcion || "Producto sin nombre";
+    const precio = p.precio || p.valor || p.valorunitario || 0;
+
+    options += `
+      <option
+        value="${p.idproducto}"
+        data-precio="${precio}"
+        data-codigo="${codigo}"
+        data-nombre="${nombre}"
+      >
+        ${codigo} · ${nombre}
+      </option>
+    `;
+  });
+
+  div.innerHTML = `
+    <div class="search-wrapper">
+      <span>🔍</span>
+      <input
+        type="text"
+        id="search_${detalleIndex}"
+        placeholder="Código o nombre"
+        onkeyup="filtrarProductos(${detalleIndex})"
+      >
+    </div>
+
+    <select
+      name="detalles[${detalleIndex}][idproducto]"
+      id="producto_${detalleIndex}"
+      onchange="setPrecio(this, ${detalleIndex})"
+      required
+    >
+      ${options}
+    </select>
+
+    <input
+      type="number"
+      name="detalles[${detalleIndex}][cantidad]"
+      value="1"
+      min="1"
+      step="1"
+      oninput="actualizarSubtotal(${detalleIndex})"
+      required
+    >
+
+    <input
+      type="number"
+      step="0.01"
+      name="detalles[${detalleIndex}][valorunitario]"
+      id="valor_${detalleIndex}"
+      data-unitario="0"
+      value=""
+      placeholder="Valor"
+      oninput="actualizarTotales()"
+      required
+    >
+
+    <input
+      type="hidden"
+      name="detalles[${detalleIndex}][subtotal]"
+      id="subtotal_${detalleIndex}"
+      value="0"
+    >
+
+    <input
+      type="hidden"
+      name="detalles[${detalleIndex}][descripcion]"
+      id="descripcion_${detalleIndex}"
+      value=""
+    >
+
+    <button type="button" class="btn-delete" onclick="eliminarDetalle(${detalleIndex})">✕</button>
+  `;
+
+  detallesDiv.appendChild(div);
+  detalleIndex++;
+
+  if (emptyDetalle) emptyDetalle.style.display = "none";
+
+  actualizarTotales();
+}
+
+
+function filtrarProductos(index) {
+  const input = document.getElementById(`search_${index}`);
+  const filtro = input.value.toUpperCase();
+  const select = document.getElementById(`producto_${index}`);
+
+  if (!select) return;
+
+  const opciones = select.getElementsByTagName("option");
+  let matchExacto = null;
+
+  for (let i = 0; i < opciones.length; i++) {
+    const texto = opciones[i].textContent.toUpperCase();
+    const codigo = opciones[i].dataset.codigo ? opciones[i].dataset.codigo.toUpperCase() : "";
+    const nombre = opciones[i].dataset.nombre ? opciones[i].dataset.nombre.toUpperCase() : "";
+
+    const coincide = texto.includes(filtro) || codigo.includes(filtro) || nombre.includes(filtro);
+
+    opciones[i].style.display = coincide ? "" : "none";
+
+    if (filtro && codigo === filtro) {
+      matchExacto = opciones[i];
+    }
+  }
+
+  if (matchExacto) {
+    select.value = matchExacto.value;
+    setPrecio(select, index);
+  }
+}
+
+
+function setPrecio(selectElem, index) {
+  const selected = selectElem.options[selectElem.selectedIndex];
+
+  if (!selected) return;
+
+  const precio = normalizarNumero(selected.dataset.precio || 0);
+  const nombre = selected.dataset.nombre || selected.textContent.trim();
+
+  const valorInput = document.getElementById(`valor_${index}`);
+  const descripcionInput = document.getElementById(`descripcion_${index}`);
+
+  if (valorInput) {
+    valorInput.value = precio.toFixed(2);
+    valorInput.dataset.unitario = precio;
+  }
+
+  if (descripcionInput) {
+    descripcionInput.value = nombre;
+  }
+
+  actualizarSubtotal(index);
+}
+
+
+function actualizarSubtotal(index) {
+  const cantidadInput = document.querySelector(`input[name="detalles[${index}][cantidad]"]`);
+  const valorInput = document.getElementById(`valor_${index}`);
+  const subtotalInput = document.getElementById(`subtotal_${index}`);
+
+  if (!cantidadInput || !valorInput || !subtotalInput) return;
+
+  const cantidad = normalizarNumero(cantidadInput.value || 1);
+  const valorUnitario = normalizarNumero(valorInput.value || 0);
+  const subtotal = cantidad * valorUnitario;
+
+  subtotalInput.value = subtotal.toFixed(2);
+
+  actualizarTotales();
+}
+
+
+function eliminarDetalle(index) {
+  const row = document.getElementById(`detalle_${index}`);
+
+  if (row) row.remove();
+
+  const detalles = document.querySelectorAll(".detalle-row");
+  const emptyDetalle = document.getElementById("emptyDetalle");
+
+  if (emptyDetalle) {
+    emptyDetalle.style.display = detalles.length === 0 ? "block" : "none";
+  }
+
+  actualizarTotales();
+}
+
+
+function addPago() {
+  const pagosDiv = document.getElementById("pagos");
+  const emptyPago = document.getElementById("emptyPago");
+
+  const div = document.createElement("div");
+  div.classList.add("pago-row");
+  div.setAttribute("id", `pago_${pagoIndex}`);
+
+  let options = '<option value="">Seleccione medio</option>';
+
+  medios.forEach(m => {
+    options += `
+      <option value="${m.idmedio}">
+        ${m.nombre || m.descripcion || ("Medio " + m.idmedio)}
+      </option>
+    `;
+  });
+
+  div.innerHTML = `
+    <select name="pagos[${pagoIndex}][idmedio]">
+      ${options}
+    </select>
+
+    <input
+      type="number"
+      step="0.01"
+      name="pagos[${pagoIndex}][valor]"
+      placeholder="Valor"
+      oninput="actualizarTotales()"
+    >
+
+    <input
+      type="text"
+      name="pagos[${pagoIndex}][observacion]"
+      value="Abono registrado con consumo"
+      placeholder="Observación"
+    >
+
+    <button type="button" class="btn-delete" onclick="eliminarPago(${pagoIndex})">✕</button>
+  `;
+
+  pagosDiv.appendChild(div);
+  pagoIndex++;
+
+  if (emptyPago) emptyPago.style.display = "none";
+
+  actualizarTotales();
+}
+
+
+function eliminarPago(index) {
+  const row = document.getElementById(`pago_${index}`);
+
+  if (row) row.remove();
+
+  const pagos = document.querySelectorAll(".pago-row");
+  const emptyPago = document.getElementById("emptyPago");
+
+  if (emptyPago) {
+    emptyPago.style.display = pagos.length === 0 ? "block" : "none";
+  }
+
+  actualizarTotales();
+}
+
+
+function actualizarTotales() {
+  let totalConsumo = 0;
+
+  document.querySelectorAll(".detalle-row").forEach(row => {
+    const id = row.id.replace("detalle_", "");
+    const cantidadInput = document.querySelector(`input[name="detalles[${id}][cantidad]"]`);
+    const valorInput = document.getElementById(`valor_${id}`);
+    const subtotalInput = document.getElementById(`subtotal_${id}`);
+
+    const cantidad = normalizarNumero(cantidadInput ? cantidadInput.value : 0);
+    const valor = normalizarNumero(valorInput ? valorInput.value : 0);
+    const subtotal = cantidad * valor;
+
+    if (subtotalInput) {
+      subtotalInput.value = subtotal.toFixed(2);
+    }
+
+    totalConsumo += subtotal;
+  });
+
+  let totalPagado = 0;
+
+  document.querySelectorAll(".pago-row input[name*='[valor]']").forEach(input => {
+    totalPagado += normalizarNumero(input.value || 0);
+  });
+
+  const saldo = totalConsumo - totalPagado;
+
+  document.getElementById("totalConsumo").innerText = formatoMoneda(totalConsumo);
+  document.getElementById("totalPagado").innerText = formatoMoneda(totalPagado);
+  document.getElementById("saldoPendiente").innerText = formatoMoneda(saldo);
+
+  const saldoCard = document.getElementById("saldoCard");
+
+  if (saldoCard) {
+    if (saldo <= 0) {
+      saldoCard.classList.add("saldo-ok");
+    } else {
+      saldoCard.classList.remove("saldo-ok");
+    }
+  }
+
+  if (totalPagado > totalConsumo) {
+    mostrarError("El total abonado no puede ser mayor al total consumido.");
+  } else {
+    ocultarError();
+  }
+}
+
+
+function enviarConsumo(event) {
+  event.preventDefault();
+
+  const form = document.getElementById("consumoForm");
+  const idcliente = document.getElementById("idcliente").value.trim();
+
+  actualizarTotales();
+
+  const totalConsumo = normalizarNumero(document.getElementById("totalConsumo").innerText);
+  const totalPagado = normalizarNumero(document.getElementById("totalPagado").innerText);
+
+  if (form.dataset.submitted === "true") {
+    return false;
+  }
+
+  if (!idcliente) {
+    mostrarError("Debes buscar y seleccionar un cliente.");
+    document.getElementById("buscarIdentificacion").focus();
+    return false;
+  }
+
+  const detallesValidos = Array.from(document.querySelectorAll(".detalle-row")).filter(row => {
+    const id = row.id.replace("detalle_", "");
+    const producto = document.getElementById(`producto_${id}`);
+    const cantidad = document.querySelector(`input[name="detalles[${id}][cantidad]"]`);
+    const valor = document.getElementById(`valor_${id}`);
+
+    return producto && producto.value && normalizarNumero(cantidad.value) > 0 && normalizarNumero(valor.value) > 0;
+  });
+
+  if (detallesValidos.length === 0) {
+    mostrarError("Debes agregar al menos un producto con cantidad y valor válido.");
+    return false;
+  }
+
+  if (totalConsumo <= 0) {
+    mostrarError("El total del consumo debe ser mayor a cero.");
+    return false;
+  }
+
+  if (totalPagado > totalConsumo) {
+    mostrarError("Los pagos no pueden ser mayores al total consumido.");
+    return false;
+  }
+
+  const mensaje =
+    totalPagado > 0
+      ? "¿Confirmas que deseas registrar este consumo con abono parcial?"
+      : "¿Confirmas que deseas registrar este consumo como cuenta abierta?";
+
+  const confirmado = confirm(mensaje);
+
+  if (!confirmado) {
+    return false;
+  }
+
+  form.dataset.allowSubmit = "true";
+
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+  } else {
+    form.submit();
+  }
+
+  return true;
+}
+
+
+function mostrarError(mensaje) {
+  const validationMessage = document.getElementById("validationMessage");
+
+  if (!validationMessage) return;
+
+  validationMessage.textContent = mensaje;
+  validationMessage.style.display = "block";
+}
+
+
+function ocultarError() {
+  const validationMessage = document.getElementById("validationMessage");
+
+  if (!validationMessage) return;
+
+  validationMessage.textContent = "";
+  validationMessage.style.display = "none";
+}
+
+
+function bloquearBotonesFormulario(form) {
+  const buttons = form.querySelectorAll("button, input[type='submit']");
+
+  buttons.forEach(function (button) {
+    const loadingText = button.dataset.loadingText || "⏳ Procesando...";
+
+    if (button.tagName.toLowerCase() === "button") {
+      button.dataset.originalText = button.innerHTML;
+      button.innerHTML = loadingText;
+    } else {
+      button.dataset.originalText = button.value;
+      button.value = loadingText;
+    }
+
+    button.disabled = true;
+    button.classList.add("btn-loading");
+  });
+}
+</script>
+
+<!-- ==============================
+     ESTILOS
+=============================== -->
+<style>
+.consumo-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 22px 54px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.consumo-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.consumo-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.consumo-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-actions {
+  flex-shrink: 0;
+}
+
+.consumo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.section-heading {
+  margin-bottom: 18px;
+}
+
+.section-heading h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.section-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.section-between {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.form-grid,
+.search-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: end;
+}
+
+.search-row {
+  grid-template-columns: 1fr auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea,
+.detalle-row input,
+.detalle-row select,
+.pago-row input,
+.pago-row select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 0 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.field textarea {
+  min-height: 110px;
+  padding: 14px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus,
+.detalle-row input:focus,
+.detalle-row select:focus,
+.pago-row input:focus,
+.pago-row select:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.info-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.info-box.success {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.info-label {
+  display: block;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.info-box strong {
+  color: #0f172a;
+  font-weight: 900;
+}
+
+.muted {
+  color: #64748b;
+  margin: 0;
+}
+
+.dynamic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-header,
+.detalle-row {
+  display: grid;
+  grid-template-columns: 1.1fr 2fr 120px 160px 46px;
+  gap: 10px;
+  align-items: center;
+}
+
+.payment-header,
+.pago-row {
+  display: grid;
+  grid-template-columns: 1.2fr 150px 1.4fr 46px;
+  gap: 10px;
+  align-items: center;
+}
+
+.detail-header,
+.payment-header {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-wrapper span {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.search-wrapper input {
+  padding-left: 38px;
+}
+
+.btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+.btn-delete {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+  font-weight: 900;
+  transition: 0.2s ease;
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+}
+
+.empty-detail {
+  margin-top: 12px;
+  padding: 18px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  text-align: center;
+}
+
+.empty-detail strong {
+  display: block;
+  color: #111827;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.empty-detail p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.totals-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.total-card {
+  border-radius: 20px;
+  padding: 20px;
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+}
+
+.total-card span {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.total-card strong {
+  display: block;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.total-blue {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.total-green {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.total-red {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+}
+
+.total-red.saldo-ok {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.validation-message {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.form-actions-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+
+.actions-note {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.actions-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-loading,
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 980px) {
+  .consumo-hero,
+  .section-between,
+  .form-actions-sticky {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-grid,
+  .search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-header,
+  .payment-header {
+    display: none;
+  }
+
+  .detalle-row,
+  .pago-row {
+    grid-template-columns: 1fr;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .totals-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-buttons {
+    justify-content: stretch;
+  }
+
+  .actions-buttons .btn {
+    flex: 1;
+  }
+}
+
+@media (max-width: 620px) {
+  .consumo-page {
+    padding: 22px 14px 42px;
+  }
+
+  .consumo-hero,
+  .form-card,
+  .form-actions-sticky {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .actions-buttons {
+    flex-direction: column;
+  }
+
+  .actions-buttons .btn,
+  .btn {
+    width: 100%;
+  }
+}
+</style>
+
+{% endblock %}

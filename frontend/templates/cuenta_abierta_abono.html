@@ -1,0 +1,827 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Abono{% endblock %}
+
+{% block content %}
+
+<div class="abono-page">
+
+  <!-- ==============================
+       ENCABEZADO
+  =============================== -->
+  <section class="abono-hero">
+    <div>
+      <a href="{{ url_for('cuentas_abiertas.detalle_cuenta', idcuenta=cuenta.idcuenta) }}" class="back-link">
+        ← Volver al Detalle
+      </a>
+
+      <h1>Registrar Abono</h1>
+
+      <p>
+        Registra un pago parcial o total sobre la cuenta abierta del cliente.
+      </p>
+
+      {% if empresa_nombre %}
+        <div class="empresa-contexto">
+          Empresa activa: <strong>{{ empresa_nombre }}</strong>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="hero-actions">
+      <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="btn btn-light">
+        Ver Cuentas
+      </a>
+    </div>
+  </section>
+
+  {% set saldo_actual = cuenta.saldo_actual|float if cuenta and cuenta.saldo_actual else 0 %}
+
+  <!-- ==============================
+       RESUMEN
+  =============================== -->
+  <section class="summary-grid">
+
+    <article class="summary-card summary-main">
+      <span class="summary-label">Saldo actual</span>
+      <strong class="{% if saldo_actual > 0 %}money-pending{% else %}money-zero{% endif %}">
+        ${{ "{:,.0f}".format(saldo_actual).replace(",", ".") }}
+      </strong>
+      <small>Valor máximo permitido para el abono.</small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Cliente</span>
+      <strong class="summary-client">
+        {{ cuenta.nombre_cliente or 'Cliente sin nombre' }}
+      </strong>
+      <small>
+        {% if cuenta.identificacion %}
+          {{ cuenta.identificacion }}
+        {% else %}
+          Sin identificación
+        {% endif %}
+      </small>
+    </article>
+
+    <article class="summary-card">
+      <span class="summary-label">Estado</span>
+      <div class="summary-badge-wrapper">
+        <span class="status-badge status-{{ cuenta.estado|lower if cuenta.estado else 'sin-estado' }}">
+          {{ cuenta.estado or 'SIN_ESTADO' }}
+        </span>
+      </div>
+      <small>Estado actual de la cuenta.</small>
+    </article>
+
+  </section>
+
+  <!-- ==============================
+       FORMULARIO
+  =============================== -->
+  <section class="form-card">
+
+    <div class="form-header">
+      <div>
+        <h2>Datos del abono</h2>
+        <p>
+          El valor registrado reducirá el saldo de la cuenta. Si el saldo llega a cero, la cuenta se cerrará automáticamente.
+        </p>
+      </div>
+    </div>
+
+    <form
+      method="post"
+      action="{{ url_for('cuentas_abiertas.registrar_abono', idcuenta=cuenta.idcuenta) }}"
+      class="abono-form form-bloqueable"
+      id="formAbono"
+      novalidate
+    >
+
+      <input type="hidden" name="idcliente" value="{{ cuenta.idcliente }}">
+      <input type="hidden" id="saldo_actual" value="{{ saldo_actual }}">
+
+      <div class="form-grid">
+
+        <div class="field">
+          <label for="valor">Valor del abono</label>
+          <input
+            id="valor"
+            name="valor"
+            type="number"
+            min="1"
+            max="{{ saldo_actual }}"
+            step="1"
+            placeholder="Ej: 50000"
+            autocomplete="off"
+            required
+          >
+          <small class="field-help">
+            No puede ser mayor al saldo actual.
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="idmedio_pago">Medio de pago</label>
+          <select id="idmedio_pago" name="idmedio_pago" required>
+            <option value="">Seleccione un medio</option>
+
+            {% for m in medios %}
+              <option value="{{ m.idmedio }}">
+                {{ m.nombre or m.descripcion or ('Medio ' ~ m.idmedio) }}
+              </option>
+            {% endfor %}
+          </select>
+          <small class="field-help">
+            Este medio debe existir en administración de medios de pago.
+          </small>
+        </div>
+
+      </div>
+
+      <div class="field">
+        <label for="observacion">Observación</label>
+        <textarea
+          id="observacion"
+          name="observacion"
+          rows="4"
+          placeholder="Ej: Abono parcial recibido en caja"
+        >Abono registrado desde Flow Lite</textarea>
+      </div>
+
+      <!-- ==============================
+           PREVISUALIZACIÓN
+      =============================== -->
+      <div class="preview-box">
+        <div>
+          <span>Saldo actual</span>
+          <strong id="previewSaldoActual">
+            ${{ "{:,.0f}".format(saldo_actual).replace(",", ".") }}
+          </strong>
+        </div>
+
+        <div>
+          <span>Abono</span>
+          <strong id="previewAbono">$0</strong>
+        </div>
+
+        <div>
+          <span>Nuevo saldo</span>
+          <strong id="previewNuevoSaldo">
+            ${{ "{:,.0f}".format(saldo_actual).replace(",", ".") }}
+          </strong>
+        </div>
+      </div>
+
+      <div class="validation-message" id="validationMessage" style="display: none;"></div>
+
+      <!-- ==============================
+           ACCIONES
+      =============================== -->
+      <div class="form-actions">
+
+        <a
+          href="{{ url_for('cuentas_abiertas.detalle_cuenta', idcuenta=cuenta.idcuenta) }}"
+          class="btn btn-light"
+        >
+          Cancelar
+        </a>
+
+        <button
+          type="button"
+          class="btn btn-primary btn-submit-abono"
+          data-loading-text="⏳ Registrando..."
+        >
+          💵 Registrar Abono
+        </button>
+
+      </div>
+
+    </form>
+
+  </section>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const form = document.getElementById("formAbono");
+  const valorInput = document.getElementById("valor");
+  const medioInput = document.getElementById("idmedio_pago");
+  const saldoInput = document.getElementById("saldo_actual");
+  const submitBtn = document.querySelector(".btn-submit-abono");
+  const validationMessage = document.getElementById("validationMessage");
+
+  const previewAbono = document.getElementById("previewAbono");
+  const previewNuevoSaldo = document.getElementById("previewNuevoSaldo");
+
+  const saldoActual = Number(saldoInput.value || 0);
+
+  /*
+    BLOQUEO GLOBAL DE ENTER
+    Evita que Enter registre el abono accidentalmente.
+  */
+  document.addEventListener("keydown", function (event) {
+    const key = event.key || event.code;
+    const target = event.target;
+    const tagName = target && target.tagName ? target.tagName.toLowerCase() : "";
+
+    if (key === "Enter" || key === "NumpadEnter") {
+      if (tagName !== "textarea") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return false;
+      }
+    }
+  }, true);
+
+
+  /*
+    Bloqueo de submit directo.
+  */
+  form.addEventListener("submit", function (event) {
+    if (form.dataset.allowSubmit !== "true") {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
+
+    if (form.dataset.submitted === "true") {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
+
+    form.dataset.submitted = "true";
+    bloquearBotonesFormulario(form);
+
+    return true;
+  });
+
+
+  /*
+    Previsualización en vivo.
+  */
+  valorInput.addEventListener("input", function () {
+    actualizarPreview();
+  });
+
+  function actualizarPreview() {
+    const valor = Number(valorInput.value || 0);
+    const nuevoSaldo = Math.max(saldoActual - valor, 0);
+
+    previewAbono.textContent = formatoMoneda(valor);
+    previewNuevoSaldo.textContent = formatoMoneda(nuevoSaldo);
+
+    if (valor > saldoActual) {
+      mostrarError("El abono no puede ser mayor al saldo actual.");
+      submitBtn.disabled = true;
+      return;
+    }
+
+    if (valor <= 0) {
+      ocultarError();
+      submitBtn.disabled = false;
+      return;
+    }
+
+    ocultarError();
+    submitBtn.disabled = false;
+  }
+
+
+  /*
+    Envío controlado solo por clic.
+  */
+  submitBtn.addEventListener("click", function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (form.dataset.submitted === "true") {
+      return false;
+    }
+
+    const valor = Number(valorInput.value || 0);
+    const medio = medioInput.value;
+
+    if (valor <= 0) {
+      mostrarError("Debes ingresar un valor de abono mayor a cero.");
+      valorInput.focus();
+      return false;
+    }
+
+    if (valor > saldoActual) {
+      mostrarError("El abono no puede ser mayor al saldo actual.");
+      valorInput.focus();
+      return false;
+    }
+
+    if (!medio) {
+      mostrarError("Debes seleccionar un medio de pago.");
+      medioInput.focus();
+      return false;
+    }
+
+    const mensajeConfirmacion =
+      valor === saldoActual
+        ? "El abono cubrirá todo el saldo pendiente. La cuenta quedará cerrada. ¿Deseas continuar?"
+        : "¿Confirmas que deseas registrar este abono?";
+
+    const confirmado = confirm(mensajeConfirmacion);
+
+    if (!confirmado) {
+      return false;
+    }
+
+    form.dataset.allowSubmit = "true";
+
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+
+    return true;
+  });
+
+
+  function mostrarError(mensaje) {
+    validationMessage.textContent = mensaje;
+    validationMessage.style.display = "block";
+  }
+
+  function ocultarError() {
+    validationMessage.textContent = "";
+    validationMessage.style.display = "none";
+  }
+
+  function formatoMoneda(valor) {
+    const numero = Number(valor || 0);
+
+    return "$" + numero.toLocaleString("es-CO", {
+      maximumFractionDigits: 0
+    });
+  }
+
+  function bloquearBotonesFormulario(form) {
+    const buttons = form.querySelectorAll("button, input[type='submit']");
+
+    buttons.forEach(function (button) {
+      const loadingText = button.dataset.loadingText || "⏳ Procesando...";
+
+      if (button.tagName.toLowerCase() === "button") {
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = loadingText;
+      } else {
+        button.dataset.originalText = button.value;
+        button.value = loadingText;
+      }
+
+      button.disabled = true;
+      button.classList.add("btn-loading");
+    });
+  }
+
+  actualizarPreview();
+
+});
+</script>
+
+<style>
+/* ==============================
+   REGISTRAR ABONO
+============================== */
+
+.abono-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 22px 48px;
+  color: #111827;
+  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ==============================
+   HERO
+============================== */
+
+.abono-hero {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.abono-hero h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.abono-hero p {
+  margin: 0;
+  color: #cbd5e1;
+  max-width: 720px;
+}
+
+.empresa-contexto {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(224, 242, 254, 0.12);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  color: #dbeafe;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.empresa-contexto strong {
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.back-link {
+  display: inline-flex;
+  color: #bfdbfe;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.94rem;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+.hero-actions {
+  flex-shrink: 0;
+}
+
+/* ==============================
+   BUTTONS
+============================== */
+
+.btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 850;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-light {
+  background: #f8fafc;
+  color: #111827;
+  border-color: #d1d5db;
+}
+
+.btn-light:hover {
+  background: #e5e7eb;
+}
+
+/* ==============================
+   SUMMARY
+============================== */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 0.8fr;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.summary-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0f172a;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: 950;
+  letter-spacing: -0.04em;
+}
+
+.summary-card small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-weight: 650;
+}
+
+.summary-label {
+  color: #475569;
+  font-size: 0.86rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-main {
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border-color: #bfdbfe;
+}
+
+.summary-client {
+  font-size: 1.2rem !important;
+  letter-spacing: -0.02em !important;
+}
+
+.summary-badge-wrapper {
+  margin-top: 14px;
+}
+
+.money-pending {
+  color: #b45309 !important;
+}
+
+.money-zero {
+  color: #166534 !important;
+}
+
+/* ==============================
+   STATUS BADGES
+============================== */
+
+.status-badge {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-abierta {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-cerrada {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-sin-estado {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+/* ==============================
+   FORM
+============================== */
+
+.form-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.form-header {
+  margin-bottom: 20px;
+}
+
+.form-header h2 {
+  margin: 0 0 5px;
+  color: #111827;
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.form-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.abono-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field label {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  background: #f8fafc;
+  color: #111827;
+  outline: none;
+  font-size: 0.94rem;
+  font-weight: 600;
+  transition: 0.2s ease;
+  font-family: inherit;
+}
+
+.field input,
+.field select {
+  height: 46px;
+  padding: 0 14px;
+}
+
+.field textarea {
+  padding: 13px 14px;
+  resize: vertical;
+  min-height: 110px;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.field-help {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+/* ==============================
+   PREVIEW
+============================== */
+
+.preview-box {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.preview-box div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.preview-box span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.preview-box strong {
+  color: #0f172a;
+  font-size: 1.2rem;
+  font-weight: 950;
+}
+
+/* ==============================
+   VALIDATION
+============================== */
+
+.validation-message {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+/* ==============================
+   ACTIONS
+============================== */
+
+.form-actions {
+  padding-top: 6px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ==============================
+   LOADING
+============================== */
+
+.btn-loading,
+button:disabled,
+input[type="submit"]:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==============================
+   RESPONSIVE
+============================== */
+
+@media (max-width: 980px) {
+  .abono-hero {
+    flex-direction: column;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid,
+  .preview-box {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .abono-page {
+    padding: 22px 14px 38px;
+  }
+
+  .abono-hero,
+  .summary-card,
+  .form-card {
+    border-radius: 18px;
+    padding: 20px;
+  }
+
+  .hero-actions,
+  .hero-actions .btn,
+  .form-actions,
+  .form-actions .btn {
+    width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+}
+</style>
+
+{% endblock %}

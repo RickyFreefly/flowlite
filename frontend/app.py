@@ -15,6 +15,7 @@ from routes.calendar_routes import calendar_bp
 from routes.paracaidistas_horas_routes import paracaidistas_horas_bp
 from routes.productos_routes import productos_bp
 from routes.medios_pago_routes import medios_pago_bp
+from routes.cuentas_abiertas_routes import cuentas_abiertas_bp
 import config
 
 app = Flask(__name__)
@@ -37,6 +38,7 @@ app.register_blueprint(paracaidistas_horas_bp)
 app.register_blueprint(energia_bp)
 app.register_blueprint(productos_bp)
 app.register_blueprint(medios_pago_bp)
+app.register_blueprint(cuentas_abiertas_bp)
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

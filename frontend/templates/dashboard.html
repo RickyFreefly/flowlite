@@ -33,9 +33,7 @@
       <div class="brand-text">
         <span class="eyebrow">FlowLite · Panel operativo</span>
 
-        <h1>
-          Dashboard
-        </h1>
+        <h1>Dashboard</h1>
 
         <p>
           {% if empresa_nombre %}
@@ -80,8 +78,6 @@
 
       <!-- =========================
            RESUMEN RÁPIDO
-           Estos valores son opcionales.
-           Si el backend no los envía, se muestra 0.
       ========================== -->
       <section class="quick-stats">
 
@@ -146,7 +142,7 @@
           <div>
             <span class="section-kicker">Operación</span>
             <h2>Gestión diaria</h2>
-            <p>Administra clientes, productos, facturación y egresos de la empresa.</p>
+            <p>Administra clientes, productos, facturación, cuentas abiertas y egresos de la empresa.</p>
           </div>
         </div>
 
@@ -202,6 +198,25 @@
               </div>
 
               <p>Emisión, consulta y seguimiento de facturación.</p>
+            </div>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
+          </a>
+
+          <a href="{{ url_for('cuentas_abiertas.listar_cuentas') }}" class="module-card module-card-wallet">
+            <div class="module-icon">
+              <i class="bi bi-wallet2"></i>
+            </div>
+
+            <div class="module-content">
+              <div class="module-title-row">
+                <h3>Cuentas Abiertas</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
+              <p>Controla fiados, saldos pendientes, abonos y cartera por cliente.</p>
             </div>
 
             <span class="module-arrow">
@@ -397,12 +412,18 @@
   --flow-shadow-hover: 0 24px 54px rgba(15, 23, 42, 0.14);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 /* ==============================
    PAGE
 ============================== */
 
 .dashboard-page {
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.12), transparent 34%),
     radial-gradient(circle at 92% 12%, rgba(20, 184, 166, 0.12), transparent 28%),
@@ -418,8 +439,9 @@
 
 .dashboard-topbar {
   max-width: 1240px;
+  width: 100%;
   margin: 0 auto 24px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(226, 232, 240, 0.95);
   border-radius: 28px;
@@ -436,6 +458,7 @@
   align-items: center;
   gap: 20px;
   min-width: 0;
+  flex: 1;
 }
 
 .logo-box {
@@ -506,6 +529,7 @@
   justify-content: flex-end;
   gap: 14px;
   flex-shrink: 0;
+  max-width: 100%;
 }
 
 .user-chip {
@@ -517,11 +541,14 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .user-avatar {
   width: 36px;
   height: 36px;
+  min-width: 36px;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--flow-primary), var(--flow-accent));
   color: #ffffff;
@@ -536,13 +563,14 @@
   display: flex;
   flex-direction: column;
   line-height: 1.12;
+  min-width: 0;
 }
 
 .user-meta strong {
   color: var(--flow-dark);
   font-size: 0.9rem;
   font-weight: 850;
-  max-width: 120px;
+  max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -574,6 +602,7 @@
   gap: 8px;
   text-align: center;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .btn-logout:hover {
@@ -588,11 +617,12 @@
 
 .dashboard-shell {
   max-width: 1240px;
+  width: 100%;
   margin: 0 auto;
 }
 
 .module-section {
-  margin-top: 28px;
+  margin-top: 32px;
 }
 
 .admin-section {
@@ -604,7 +634,7 @@
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .section-header h2 {
@@ -628,12 +658,12 @@
 .quick-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 30px;
+  gap: 18px;
+  margin-bottom: 34px;
 }
 
 .stat-card {
-  min-height: 104px;
+  min-height: 108px;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--flow-border);
   border-radius: 24px;
@@ -642,6 +672,7 @@
   display: flex;
   align-items: center;
   gap: 15px;
+  min-width: 0;
 }
 
 .stat-icon {
@@ -712,16 +743,16 @@
 
 .dashboard-grid {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .dashboard-grid-main {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dashboard-grid-secondary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 620px;
+  max-width: 760px;
 }
 
 /* ==============================
@@ -730,19 +761,20 @@
 
 .module-card {
   position: relative;
-  min-height: 138px;
+  min-height: 150px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid var(--flow-border);
   border-radius: 24px;
-  padding: 20px;
+  padding: 22px;
   text-decoration: none;
   color: var(--flow-dark);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
   display: flex;
   align-items: flex-start;
-  gap: 15px;
+  gap: 16px;
   overflow: hidden;
   isolation: isolate;
+  min-width: 0;
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -785,9 +817,9 @@
 }
 
 .module-icon {
-  width: 50px;
-  height: 50px;
-  min-width: 50px;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
   border-radius: 17px;
   display: flex;
   align-items: center;
@@ -801,7 +833,8 @@
 .module-content {
   z-index: 2;
   min-width: 0;
-  padding-right: 8px;
+  padding-right: 22px;
+  flex: 1;
 }
 
 .module-title-row {
@@ -809,22 +842,25 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 7px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .module-content h3 {
   margin: 0;
   color: var(--flow-dark);
-  font-size: 1rem;
+  font-size: 1.04rem;
   line-height: 1.15;
   font-weight: 900;
   letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
 }
 
 .module-content p {
   margin: 0;
   color: var(--flow-muted);
-  font-size: 0.84rem;
-  line-height: 1.42;
+  font-size: 0.86rem;
+  line-height: 1.45;
   font-weight: 500;
 }
 
@@ -841,6 +877,7 @@
   letter-spacing: 0.035em;
   text-transform: uppercase;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .module-arrow {
@@ -881,6 +918,12 @@
   --card-color: #dc2626;
   --card-soft: #fee2e2;
   --card-border: #fecaca;
+}
+
+.module-card-wallet {
+  --card-color: #d97706;
+  --card-soft: #fef3c7;
+  --card-border: #fde68a;
 }
 
 .module-card-teal {
@@ -968,6 +1011,7 @@
   align-items: center;
   justify-content: center;
   transition: 0.18s ease;
+  max-width: 100%;
 }
 
 .btn-empty-logout:hover {
@@ -981,6 +1025,10 @@
 ============================== */
 
 @media (max-width: 1180px) {
+  .dashboard-topbar {
+    align-items: flex-start;
+  }
+
   .quick-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -996,7 +1044,6 @@
 
 @media (max-width: 860px) {
   .dashboard-topbar {
-    align-items: flex-start;
     flex-direction: column;
   }
 
@@ -1016,12 +1063,14 @@
   }
 
   .dashboard-topbar {
+    width: 100%;
     border-radius: 24px;
     padding: 22px;
     gap: 20px;
   }
 
   .brand-block {
+    width: 100%;
     flex-direction: column;
     gap: 14px;
   }
@@ -1031,15 +1080,22 @@
     height: 72px;
   }
 
+  .brand-text {
+    width: 100%;
+  }
+
   .brand-text h1 {
     font-size: 2rem;
+    line-height: 1.05;
   }
 
   .brand-text p {
     font-size: 0.9rem;
+    line-height: 1.35;
   }
 
   .user-actions {
+    width: 100%;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
@@ -1048,7 +1104,17 @@
   .user-chip,
   .btn-logout {
     width: 100%;
+    max-width: 100%;
     justify-content: center;
+  }
+
+  .user-chip {
+    border-radius: 22px;
+    padding: 12px;
+  }
+
+  .user-meta strong {
+    max-width: 220px;
   }
 
   .quick-stats,
@@ -1057,13 +1123,17 @@
     grid-template-columns: 1fr;
   }
 
+  .quick-stats {
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
   .stat-card {
     min-height: 96px;
   }
 
-  .module-card {
-    min-height: 128px;
-    border-radius: 22px;
+  .module-section {
+    margin-top: 30px;
   }
 
   .section-header h2 {
@@ -1072,12 +1142,95 @@
 
   .section-header p {
     font-size: 0.88rem;
+    line-height: 1.4;
+  }
+
+  .module-card {
+    min-height: 132px;
+    border-radius: 22px;
+    padding: 20px;
+    gap: 14px;
+  }
+
+  .module-content {
+    padding-right: 20px;
+  }
+
+  .module-title-row {
+    align-items: flex-start;
+  }
+
+  .module-content h3 {
+    font-size: 1.02rem;
+  }
+
+  .module-content p {
+    font-size: 0.86rem;
+  }
+
+  .module-arrow {
+    right: 16px;
+    top: 16px;
   }
 }
 
 @media (max-width: 420px) {
+  .dashboard-page {
+    padding: 18px 10px 34px;
+  }
+
+  .dashboard-topbar {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .logo-box {
+    width: 96px;
+    height: 68px;
+  }
+
+  .eyebrow,
+  .section-kicker {
+    font-size: 0.72rem;
+  }
+
+  .brand-text h1 {
+    font-size: 1.78rem;
+  }
+
+  .brand-text p {
+    font-size: 0.86rem;
+  }
+
+  .user-chip {
+    min-height: auto;
+  }
+
+  .btn-logout {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.88rem;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-icon,
+  .module-icon {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    border-radius: 15px;
+    font-size: 1.18rem;
+  }
+
+  .module-card {
+    padding: 18px;
+    min-height: 126px;
+  }
+
   .module-title-row {
-    align-items: flex-start;
     flex-direction: column;
     gap: 5px;
   }
@@ -1087,8 +1240,12 @@
   }
 
   .module-arrow {
-    right: 16px;
-    top: 16px;
+    right: 14px;
+    top: 14px;
+  }
+
+  .module-status {
+    font-size: 0.6rem;
   }
 }
 </style>
