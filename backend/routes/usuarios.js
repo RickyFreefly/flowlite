@@ -1,17 +1,187 @@
 // routes/usuarios.js
 import express from "express";
-import { query } from "../db.js";
+import { query, getConnection } from "../db.js";
 import bcrypt from "bcrypt";
+import { authJwt } from "./authJwt.js";
 
 const router = express.Router();
 
 // =====================================================
-// RUTA PÚBLICA: bootstrap
+// RUTA PÚBLICA: Crear primer usuario administrador
+// POST /api/usuarios/bootstrap
 // =====================================================
 router.post("/bootstrap", async (req, res) => {
-  // código para crear primer usuario
+  let client;
+
+  console.log("🟡 [BOOTSTRAP] Inicio petición");
+
+  try {
+    const {
+      nombrecompleto,
+      username,
+      passwordhash,
+      email,
+      idempresa
+    } = req.body;
+
+    console.log("🟡 [BOOTSTRAP] Body recibido:", {
+      nombrecompleto,
+      username,
+      email,
+      idempresa
+    });
+
+    if (!nombrecompleto || !username || !passwordhash || !idempresa) {
+      return res.status(400).json({
+        success: false,
+        error: "Nombre completo, username, contraseña e idempresa son obligatorios"
+      });
+    }
+
+    console.log("🟡 [BOOTSTRAP] Solicitando conexión...");
+    client = await getConnection();
+    console.log("✅ [BOOTSTRAP] Conexión obtenida");
+
+    // Validar empresa
+    const empresaResult = await client.query(
+      `
+      SELECT idempresa, nombre, activo
+      FROM empresas
+      WHERE idempresa = $1
+      `,
+      [idempresa]
+    );
+
+    console.log("✅ [BOOTSTRAP] Empresa result:", empresaResult.rows);
+
+    if (empresaResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "La empresa indicada no existe"
+      });
+    }
+
+    if (empresaResult.rows[0].activo !== true) {
+      return res.status(400).json({
+        success: false,
+        error: "La empresa indicada está inactiva"
+      });
+    }
+
+    // Validar si ya existen usuarios
+    const totalUsuariosResult = await client.query(`
+      SELECT COUNT(*)::int AS total
+      FROM usuarios
+    `);
+
+    const totalUsuarios = totalUsuariosResult.rows[0].total;
+
+    console.log("✅ [BOOTSTRAP] Total usuarios:", totalUsuarios);
+
+    if (totalUsuarios > 0) {
+      return res.status(403).json({
+        success: false,
+        error: "Bootstrap deshabilitado. Ya existen usuarios en el sistema."
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(passwordhash, 10);
+
+    await client.query("BEGIN");
+
+    const usuarioResult = await client.query(
+      `
+      INSERT INTO usuarios (
+        nombrecompleto,
+        username,
+        passwordhash,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      )
+      VALUES ($1, LOWER($2), $3, 'ADMIN', $4, true, NOW(), NOW())
+      RETURNING 
+        idusuario,
+        nombrecompleto,
+        username,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      `,
+      [
+        nombrecompleto,
+        username,
+        hashedPassword,
+        email || null
+      ]
+    );
+
+    const usuario = usuarioResult.rows[0];
+
+    const usuarioEmpresaResult = await client.query(
+      `
+      INSERT INTO usuario_empresa (
+        idusuario,
+        idempresa,
+        rol_empresa,
+        activo,
+        es_predeterminada,
+        createdat,
+        updatedat
+      )
+      VALUES ($1, $2, 'ADMIN', true, true, NOW(), NOW())
+      RETURNING *
+      `,
+      [
+        usuario.idusuario,
+        idempresa
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    console.log("✅ [BOOTSTRAP] Usuario administrador creado");
+
+    return res.status(201).json({
+      success: true,
+      mensaje: "Usuario administrador inicial creado correctamente",
+      usuario,
+      usuario_empresa: usuarioEmpresaResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error("❌ [BOOTSTRAP] Error:", error);
+
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("❌ [BOOTSTRAP] Error haciendo rollback:", rollbackError);
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: "Error creando usuario bootstrap",
+      detalle: error.message
+    });
+
+  } finally {
+    if (client) {
+      client.release();
+      console.log("🟢 [BOOTSTRAP] Cliente liberado");
+    }
+  }
 });
 
+// =====================================================
+// DESDE AQUÍ TODAS LAS RUTAS REQUIEREN TOKEN
+// =====================================================
+router.use(authJwt);
 
 // ================== GET: Listar usuarios ==================
 router.get("/", async (req, res) => {
@@ -51,138 +221,6 @@ router.get("/", async (req, res) => {
 
     res.status(500).json({
       error: "Error obteniendo usuarios",
-      detalle: error.message
-    });
-  }
-});
-
-// ================== POST: Crear primer usuario administrador ==================
-router.post("/bootstrap", async (req, res) => {
-  try {
-    const {
-      nombrecompleto,
-      username,
-      passwordhash,
-      email,
-      idempresa
-    } = req.body;
-
-    if (!nombrecompleto || !username || !passwordhash || !idempresa) {
-      return res.status(400).json({
-        success: false,
-        error: "Nombre completo, username, contraseña e idempresa son obligatorios"
-      });
-    }
-
-    const totalUsuariosResult = await query(`
-      SELECT COUNT(*)::int AS total
-      FROM usuarios
-    `);
-
-    const totalUsuarios = totalUsuariosResult.rows[0].total;
-
-    if (totalUsuarios > 0) {
-      return res.status(403).json({
-        success: false,
-        error: "Bootstrap deshabilitado. Ya existen usuarios en el sistema."
-      });
-    }
-
-    const empresaResult = await query(
-      `
-      SELECT idempresa
-      FROM empresas
-      WHERE idempresa = $1
-        AND activo = true
-      `,
-      [idempresa]
-    );
-
-    if (empresaResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: "La empresa indicada no existe o está inactiva"
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(passwordhash, 10);
-
-    await query("BEGIN");
-
-    try {
-      const usuarioResult = await query(
-        `
-        INSERT INTO usuarios (
-          nombrecompleto,
-          username,
-          passwordhash,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
-        )
-        VALUES ($1, LOWER($2), $3, 'ADMIN', $4, true, NOW(), NOW())
-        RETURNING 
-          idusuario,
-          nombrecompleto,
-          username,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
-        `,
-        [
-          nombrecompleto,
-          username,
-          hashedPassword,
-          email || null
-        ]
-      );
-
-      const usuario = usuarioResult.rows[0];
-
-      const usuarioEmpresaResult = await query(
-        `
-        INSERT INTO usuario_empresa (
-          idusuario,
-          idempresa,
-          rol_empresa,
-          activo,
-          es_predeterminada,
-          createdat,
-          updatedat
-        )
-        VALUES ($1, $2, 'ADMIN', true, true, NOW(), NOW())
-        RETURNING *
-        `,
-        [
-          usuario.idusuario,
-          idempresa
-        ]
-      );
-
-      await query("COMMIT");
-
-      return res.status(201).json({
-        success: true,
-        mensaje: "Usuario administrador inicial creado correctamente",
-        usuario,
-        usuario_empresa: usuarioEmpresaResult.rows[0]
-      });
-
-    } catch (transactionError) {
-      await query("ROLLBACK");
-      throw transactionError;
-    }
-
-  } catch (error) {
-    console.error("❌ Error creando usuario bootstrap:", error);
-
-    return res.status(500).json({
-      success: false,
-      error: "Error creando usuario bootstrap",
       detalle: error.message
     });
   }
@@ -244,6 +282,8 @@ router.get("/:id", async (req, res) => {
 
 // ================== POST: Crear usuario ==================
 router.post("/", async (req, res) => {
+  let client;
+
   try {
     const {
       nombrecompleto,
@@ -261,8 +301,10 @@ router.post("/", async (req, res) => {
       });
     }
 
+    client = await getConnection();
+
     // Validar empresa activa
-    const empresaResult = await query(
+    const empresaResult = await client.query(
       `
       SELECT idempresa, nombre
       FROM empresas
@@ -279,7 +321,7 @@ router.post("/", async (req, res) => {
     }
 
     // Validar username duplicado
-    const usernameResult = await query(
+    const usernameResult = await client.query(
       `
       SELECT idusuario
       FROM usuarios
@@ -296,7 +338,7 @@ router.post("/", async (req, res) => {
 
     // Validar email duplicado si viene informado
     if (email) {
-      const emailResult = await query(
+      const emailResult = await client.query(
         `
         SELECT idusuario
         FROM usuarios
@@ -312,91 +354,100 @@ router.post("/", async (req, res) => {
       }
     }
 
-    await query("BEGIN");
+    await client.query("BEGIN");
 
-    try {
-      const hashedPassword = await bcrypt.hash(passwordhash, 10);
+    const hashedPassword = await bcrypt.hash(passwordhash, 10);
 
-      const usuarioResult = await query(
-        `
-        INSERT INTO usuarios (
-          nombrecompleto,
-          username,
-          passwordhash,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
-        )
-        VALUES ($1, LOWER($2), $3, $4, $5, true, NOW(), NOW())
-        RETURNING 
-          idusuario,
-          nombrecompleto,
-          username,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
-        `,
-        [
-          nombrecompleto,
-          username,
-          hashedPassword,
-          rol || "CAJERO",
-          email || null
-        ]
-      );
+    const usuarioResult = await client.query(
+      `
+      INSERT INTO usuarios (
+        nombrecompleto,
+        username,
+        passwordhash,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      )
+      VALUES ($1, LOWER($2), $3, $4, $5, true, NOW(), NOW())
+      RETURNING 
+        idusuario,
+        nombrecompleto,
+        username,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      `,
+      [
+        nombrecompleto,
+        username,
+        hashedPassword,
+        rol || "CAJERO",
+        email || null
+      ]
+    );
 
-      const usuario = usuarioResult.rows[0];
+    const usuario = usuarioResult.rows[0];
 
-      const usuarioEmpresaResult = await query(
-        `
-        INSERT INTO usuario_empresa (
-          idusuario,
-          idempresa,
-          rol_empresa,
-          activo,
-          es_predeterminada,
-          createdat,
-          updatedat
-        )
-        VALUES ($1, $2, $3, true, true, NOW(), NOW())
-        RETURNING *
-        `,
-        [
-          usuario.idusuario,
-          idempresa,
-          rol_empresa || rol || "CAJERO"
-        ]
-      );
+    const usuarioEmpresaResult = await client.query(
+      `
+      INSERT INTO usuario_empresa (
+        idusuario,
+        idempresa,
+        rol_empresa,
+        activo,
+        es_predeterminada,
+        createdat,
+        updatedat
+      )
+      VALUES ($1, $2, $3, true, true, NOW(), NOW())
+      RETURNING *
+      `,
+      [
+        usuario.idusuario,
+        idempresa,
+        rol_empresa || rol || "CAJERO"
+      ]
+    );
 
-      await query("COMMIT");
+    await client.query("COMMIT");
 
-      res.status(201).json({
-        mensaje: "Usuario creado y asociado a la empresa correctamente",
-        usuario,
-        usuario_empresa: usuarioEmpresaResult.rows[0]
-      });
-
-    } catch (transactionError) {
-      await query("ROLLBACK");
-      throw transactionError;
-    }
+    res.status(201).json({
+      mensaje: "Usuario creado y asociado a la empresa correctamente",
+      usuario,
+      usuario_empresa: usuarioEmpresaResult.rows[0]
+    });
 
   } catch (error) {
     console.error("❌ Error creando usuario:", error);
+
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("❌ Error haciendo rollback:", rollbackError);
+      }
+    }
 
     res.status(500).json({
       error: "Error creando usuario",
       detalle: error.message
     });
+
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 });
 
 // ================== PUT: Actualizar usuario ==================
 router.put("/:id", async (req, res) => {
+  let client;
+
   try {
     const { id } = req.params;
 
@@ -412,7 +463,9 @@ router.put("/:id", async (req, res) => {
       es_predeterminada
     } = req.body;
 
-    const usuarioActualResult = await query(
+    client = await getConnection();
+
+    const usuarioActualResult = await client.query(
       `
       SELECT *
       FROM usuarios
@@ -431,7 +484,7 @@ router.put("/:id", async (req, res) => {
 
     // Validar username duplicado en otro usuario
     if (username) {
-      const usernameResult = await query(
+      const usernameResult = await client.query(
         `
         SELECT idusuario
         FROM usuarios
@@ -450,7 +503,7 @@ router.put("/:id", async (req, res) => {
 
     // Validar email duplicado en otro usuario
     if (email) {
-      const emailResult = await query(
+      const emailResult = await client.query(
         `
         SELECT idusuario
         FROM usuarios
@@ -469,7 +522,7 @@ router.put("/:id", async (req, res) => {
 
     // Validar empresa si viene idempresa
     if (idempresa) {
-      const empresaResult = await query(
+      const empresaResult = await client.query(
         `
         SELECT idempresa
         FROM empresas
@@ -493,218 +546,232 @@ router.put("/:id", async (req, res) => {
       passwordhash = usuarioActual.passwordhash;
     }
 
-    await query("BEGIN");
+    await client.query("BEGIN");
 
-    try {
-      const usuarioResult = await query(
+    const usuarioResult = await client.query(
+      `
+      UPDATE usuarios
+      SET 
+        nombrecompleto = $1,
+        username = LOWER($2),
+        passwordhash = $3,
+        rol = $4,
+        email = $5,
+        activo = $6,
+        updatedat = NOW()
+      WHERE idusuario = $7
+      RETURNING 
+        idusuario,
+        nombrecompleto,
+        username,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      `,
+      [
+        nombrecompleto ?? usuarioActual.nombrecompleto,
+        username ?? usuarioActual.username,
+        passwordhash,
+        rol ?? usuarioActual.rol,
+        email ?? usuarioActual.email,
+        activo ?? usuarioActual.activo,
+        id
+      ]
+    );
+
+    let usuarioEmpresa = null;
+
+    if (idempresa) {
+      if (es_predeterminada === true || es_predeterminada === undefined) {
+        await client.query(
+          `
+          UPDATE usuario_empresa
+          SET es_predeterminada = false,
+              updatedat = NOW()
+          WHERE idusuario = $1
+          `,
+          [id]
+        );
+      }
+
+      const relacionActualResult = await client.query(
         `
-        UPDATE usuarios
-        SET 
-          nombrecompleto = $1,
-          username = LOWER($2),
-          passwordhash = $3,
-          rol = $4,
-          email = $5,
-          activo = $6,
-          updatedat = NOW()
-        WHERE idusuario = $7
-        RETURNING 
-          idusuario,
-          nombrecompleto,
-          username,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
+        SELECT idusuario_empresa
+        FROM usuario_empresa
+        WHERE idusuario = $1
+          AND idempresa = $2
         `,
-        [
-          nombrecompleto ?? usuarioActual.nombrecompleto,
-          username ?? usuarioActual.username,
-          passwordhash,
-          rol ?? usuarioActual.rol,
-          email ?? usuarioActual.email,
-          activo ?? usuarioActual.activo,
-          id
-        ]
+        [id, idempresa]
       );
 
-      let usuarioEmpresa = null;
-
-      if (idempresa) {
-        // Si cambia empresa predeterminada, primero quitar predeterminada anterior
-        if (es_predeterminada === true || es_predeterminada === undefined) {
-          await query(
-            `
-            UPDATE usuario_empresa
-            SET es_predeterminada = false,
-                updatedat = NOW()
-            WHERE idusuario = $1
-            `,
-            [id]
-          );
-        }
-
-        const relacionActualResult = await query(
-          `
-          SELECT idusuario_empresa
-          FROM usuario_empresa
-          WHERE idusuario = $1
-            AND idempresa = $2
-          `,
-          [id, idempresa]
-        );
-
-        if (relacionActualResult.rows.length > 0) {
-          const updateRelacionResult = await query(
-            `
-            UPDATE usuario_empresa
-            SET 
-              rol_empresa = $1,
-              activo = true,
-              es_predeterminada = $2,
-              updatedat = NOW()
-            WHERE idusuario = $3
-              AND idempresa = $4
-            RETURNING *
-            `,
-            [
-              rol_empresa || rol || usuarioActual.rol || "CAJERO",
-              es_predeterminada === undefined ? true : es_predeterminada,
-              id,
-              idempresa
-            ]
-          );
-
-          usuarioEmpresa = updateRelacionResult.rows[0];
-        } else {
-          const insertRelacionResult = await query(
-            `
-            INSERT INTO usuario_empresa (
-              idusuario,
-              idempresa,
-              rol_empresa,
-              activo,
-              es_predeterminada,
-              createdat,
-              updatedat
-            )
-            VALUES ($1, $2, $3, true, $4, NOW(), NOW())
-            RETURNING *
-            `,
-            [
-              id,
-              idempresa,
-              rol_empresa || rol || usuarioActual.rol || "CAJERO",
-              es_predeterminada === undefined ? true : es_predeterminada
-            ]
-          );
-
-          usuarioEmpresa = insertRelacionResult.rows[0];
-        }
-      } else if (rol_empresa) {
-        // Actualizar rol en empresa predeterminada si no se envía idempresa
-        const updateRelacionResult = await query(
+      if (relacionActualResult.rows.length > 0) {
+        const updateRelacionResult = await client.query(
           `
           UPDATE usuario_empresa
           SET 
             rol_empresa = $1,
+            activo = true,
+            es_predeterminada = $2,
             updatedat = NOW()
-          WHERE idusuario = $2
-            AND es_predeterminada = true
+          WHERE idusuario = $3
+            AND idempresa = $4
           RETURNING *
           `,
-          [rol_empresa, id]
+          [
+            rol_empresa || rol || usuarioActual.rol || "CAJERO",
+            es_predeterminada === undefined ? true : es_predeterminada,
+            id,
+            idempresa
+          ]
         );
 
-        usuarioEmpresa = updateRelacionResult.rows[0] || null;
+        usuarioEmpresa = updateRelacionResult.rows[0];
+      } else {
+        const insertRelacionResult = await client.query(
+          `
+          INSERT INTO usuario_empresa (
+            idusuario,
+            idempresa,
+            rol_empresa,
+            activo,
+            es_predeterminada,
+            createdat,
+            updatedat
+          )
+          VALUES ($1, $2, $3, true, $4, NOW(), NOW())
+          RETURNING *
+          `,
+          [
+            id,
+            idempresa,
+            rol_empresa || rol || usuarioActual.rol || "CAJERO",
+            es_predeterminada === undefined ? true : es_predeterminada
+          ]
+        );
+
+        usuarioEmpresa = insertRelacionResult.rows[0];
       }
+    } else if (rol_empresa) {
+      const updateRelacionResult = await client.query(
+        `
+        UPDATE usuario_empresa
+        SET 
+          rol_empresa = $1,
+          updatedat = NOW()
+        WHERE idusuario = $2
+          AND es_predeterminada = true
+        RETURNING *
+        `,
+        [rol_empresa, id]
+      );
 
-      await query("COMMIT");
-
-      res.json({
-        mensaje: "Usuario actualizado correctamente",
-        usuario: usuarioResult.rows[0],
-        usuario_empresa: usuarioEmpresa
-      });
-
-    } catch (transactionError) {
-      await query("ROLLBACK");
-      throw transactionError;
+      usuarioEmpresa = updateRelacionResult.rows[0] || null;
     }
+
+    await client.query("COMMIT");
+
+    res.json({
+      mensaje: "Usuario actualizado correctamente",
+      usuario: usuarioResult.rows[0],
+      usuario_empresa: usuarioEmpresa
+    });
 
   } catch (error) {
     console.error("❌ Error actualizando usuario:", error);
+
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("❌ Error haciendo rollback:", rollbackError);
+      }
+    }
 
     res.status(500).json({
       error: "Error actualizando usuario",
       detalle: error.message
     });
+
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 });
 
 // ================== DELETE: Eliminar usuario ==================
 router.delete("/:id", async (req, res) => {
+  let client;
+
   try {
     const { id } = req.params;
 
-    await query("BEGIN");
+    client = await getConnection();
 
-    try {
-      // Primero eliminar relaciones con empresas
-      await query(
-        `
-        DELETE FROM usuario_empresa
-        WHERE idusuario = $1
-        `,
-        [id]
-      );
+    await client.query("BEGIN");
 
-      // Luego eliminar usuario
-      const result = await query(
-        `
-        DELETE FROM usuarios
-        WHERE idusuario = $1
-        RETURNING 
-          idusuario,
-          nombrecompleto,
-          username,
-          rol,
-          email,
-          activo,
-          createdat,
-          updatedat
-        `,
-        [id]
-      );
+    await client.query(
+      `
+      DELETE FROM usuario_empresa
+      WHERE idusuario = $1
+      `,
+      [id]
+    );
 
-      if (result.rows.length === 0) {
-        await query("ROLLBACK");
+    const result = await client.query(
+      `
+      DELETE FROM usuarios
+      WHERE idusuario = $1
+      RETURNING 
+        idusuario,
+        nombrecompleto,
+        username,
+        rol,
+        email,
+        activo,
+        createdat,
+        updatedat
+      `,
+      [id]
+    );
 
-        return res.status(404).json({
-          error: "Usuario no encontrado"
-        });
-      }
+    if (result.rows.length === 0) {
+      await client.query("ROLLBACK");
 
-      await query("COMMIT");
-
-      res.json({
-        mensaje: "Usuario eliminado correctamente",
-        usuario: result.rows[0]
+      return res.status(404).json({
+        error: "Usuario no encontrado"
       });
-
-    } catch (transactionError) {
-      await query("ROLLBACK");
-      throw transactionError;
     }
+
+    await client.query("COMMIT");
+
+    res.json({
+      mensaje: "Usuario eliminado correctamente",
+      usuario: result.rows[0]
+    });
 
   } catch (error) {
     console.error("❌ Error eliminando usuario:", error);
+
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("❌ Error haciendo rollback:", rollbackError);
+      }
+    }
 
     res.status(500).json({
       error: "Error eliminando usuario",
       detalle: error.message
     });
+
+  } finally {
+    if (client) {
+      client.release();
+    }
   }
 });
 
