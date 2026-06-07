@@ -2,7 +2,9 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
+
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
 {# ======================================================
    Control por rol FlowLite:
@@ -18,25 +20,27 @@
        TOP BAR
   ========================== -->
   <header class="dashboard-topbar">
+
     <div class="brand-block">
 
-      <!-- 
-        Logo del top bar:
-        - Si la empresa tiene logo_url en BD, Flask envía empresa_logo_url.
-        - Si no tiene logo, se usa el logo actual de FlowLite.
-        - Si la imagen falla, vuelve al logo de FlowLite.
-      -->
-      <img src="{{ empresa_logo_url or url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
-           alt="{{ empresa_nombre or 'FlowLite' }}"
-           class="brand-logo"
-           onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}';">
+      <div class="logo-box">
+        <img src="{{ empresa_logo_url or url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}"
+             alt="{{ empresa_nombre or 'FlowLite' }}"
+             class="brand-logo"
+             onerror="this.onerror=null; this.src='{{ url_for('static', filename='img/LOGO-VERTICALSMALL.png') }}';">
+      </div>
 
       <div class="brand-text">
-        <h1>Bienvenido, <span>{{ username }}</span></h1>
+        <span class="eyebrow">FlowLite · Panel operativo</span>
+
+        <h1>
+          Dashboard
+        </h1>
 
         <p>
           {% if empresa_nombre %}
-            Empresa activa: <strong>{{ empresa_nombre }}</strong>
+            Empresa activa:
+            <strong>{{ empresa_nombre }}</strong>
           {% elif isAdmin %}
             Panel principal de administración FlowLite
           {% else %}
@@ -44,17 +48,27 @@
           {% endif %}
         </p>
       </div>
+
     </div>
 
     <div class="user-actions">
-      <span class="role-pill">
-        {{ userRol or 'SIN ROL' }}
-      </span>
+      <div class="user-chip">
+        <span class="user-avatar">
+          {{ (username or 'U')[0:1]|upper }}
+        </span>
+
+        <div class="user-meta">
+          <strong>{{ username }}</strong>
+          <small>{{ userRol or 'SIN ROL' }}</small>
+        </div>
+      </div>
 
       <a href="{{ url_for('auth.logout') }}" class="btn-logout">
+        <i class="bi bi-box-arrow-right"></i>
         Cerrar sesión
       </a>
     </div>
+
   </header>
 
   <!-- =========================
@@ -65,52 +79,153 @@
     {% if isAdmin %}
 
       <!-- =========================
+           RESUMEN RÁPIDO
+           Estos valores son opcionales.
+           Si el backend no los envía, se muestra 0.
+      ========================== -->
+      <section class="quick-stats">
+
+        <article class="stat-card">
+          <div class="stat-icon stat-blue">
+            <i class="bi bi-people-fill"></i>
+          </div>
+
+          <div class="stat-info">
+            <span>Clientes</span>
+            <strong>{{ total_clientes or 0 }}</strong>
+            <small>Registrados</small>
+          </div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-icon stat-purple">
+            <i class="bi bi-box-seam"></i>
+          </div>
+
+          <div class="stat-info">
+            <span>Productos</span>
+            <strong>{{ total_productos or 0 }}</strong>
+            <small>Activos</small>
+          </div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-icon stat-green">
+            <i class="bi bi-receipt-cutoff"></i>
+          </div>
+
+          <div class="stat-info">
+            <span>Facturas hoy</span>
+            <strong>{{ facturas_hoy or 0 }}</strong>
+            <small>Emitidas</small>
+          </div>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-icon stat-red">
+            <i class="bi bi-cash-coin"></i>
+          </div>
+
+          <div class="stat-info">
+            <span>Egresos hoy</span>
+            <strong>
+              ${{ "{:,.0f}".format(egresos_hoy or 0).replace(",", ".") }}
+            </strong>
+            <small>Salidas registradas</small>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- =========================
            SECCIÓN OPERACIÓN
       ========================== -->
       <section class="module-section">
+
         <div class="section-header">
           <div>
-            <h2>Operación</h2>
-            <p>Gestión diaria de clientes, productos, facturación y egresos.</p>
+            <span class="section-kicker">Operación</span>
+            <h2>Gestión diaria</h2>
+            <p>Administra clientes, productos, facturación y egresos de la empresa.</p>
           </div>
         </div>
 
-        <div class="dashboard-grid">
+        <div class="dashboard-grid dashboard-grid-main">
 
           <a href="{{ url_for('clientes.listar_clientes') }}" class="module-card module-card-blue">
-            <div class="module-icon">👥</div>
+            <div class="module-icon">
+              <i class="bi bi-people-fill"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Clientes</h3>
+              <div class="module-title-row">
+                <h3>Clientes</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Consulta, creación y actualización de clientes por empresa.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
-          <a href="{{ url_for('productos.listar_productos') }}" class="module-card module-card-products">
-            <div class="module-icon">📦</div>
+          <a href="{{ url_for('productos.listar_productos') }}" class="module-card module-card-purple">
+            <div class="module-icon">
+              <i class="bi bi-box-seam"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Productos</h3>
+              <div class="module-title-row">
+                <h3>Productos</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Administra productos, servicios, paquetes, precios e impuestos.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
           <a href="{{ url_for('facturas.listar_facturas') }}" class="module-card module-card-green">
-            <div class="module-icon">🧾</div>
+            <div class="module-icon">
+              <i class="bi bi-receipt-cutoff"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Facturas</h3>
+              <div class="module-title-row">
+                <h3>Facturas</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Emisión, consulta y seguimiento de facturación.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
           <a href="{{ url_for('egresos.listar_egresos') }}" class="module-card module-card-red">
-            <div class="module-icon">💸</div>
+            <div class="module-icon">
+              <i class="bi bi-cash-coin"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Egresos</h3>
+              <div class="module-title-row">
+                <h3>Egresos</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Registro de gastos, pagos y salidas de dinero.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
         </div>
@@ -120,31 +235,53 @@
            SECCIÓN INFORMES Y CONTROL
       ========================== -->
       <section class="module-section">
+
         <div class="section-header">
           <div>
-            <h2>Informes y control</h2>
+            <span class="section-kicker">Control</span>
+            <h2>Informes y cierres</h2>
             <p>Cierres, reportes financieros e indicadores básicos de gestión.</p>
           </div>
         </div>
 
-        <div class="dashboard-grid">
+        <div class="dashboard-grid dashboard-grid-secondary">
 
           <a href="{{ url_for('cierre.cierre_dia') }}" class="module-card module-card-teal">
-            <div class="module-icon">📆</div>
+            <div class="module-icon">
+              <i class="bi bi-calendar-check"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Cierre Día</h3>
+              <div class="module-title-row">
+                <h3>Cierre Día</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Resumen financiero y operativo del día actual.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
           <a href="{{ url_for('informe.cierre_informe') }}" class="module-card module-card-indigo">
-            <div class="module-icon">📈</div>
+            <div class="module-icon">
+              <i class="bi bi-graph-up-arrow"></i>
+            </div>
+
             <div class="module-content">
-              <h3>Informe por Fechas</h3>
+              <div class="module-title-row">
+                <h3>Informe por Fechas</h3>
+                <span class="module-status">Activo</span>
+              </div>
+
               <p>Ingresos, egresos y saldos por rango de fechas.</p>
             </div>
-            <span class="module-arrow">→</span>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
         </div>
@@ -153,32 +290,54 @@
       <!-- =========================
            SECCIÓN ADMINISTRACIÓN
       ========================== -->
-      <section class="module-section">
+      <section class="module-section admin-section">
+
         <div class="section-header">
           <div>
+            <span class="section-kicker">Configuración</span>
             <h2>Administración</h2>
-            <p>Gestión de usuarios y configuración operativa del sistema.</p>
+            <p>Gestión de usuarios y parámetros operativos del sistema.</p>
           </div>
         </div>
 
-        <div class="dashboard-grid">
+        <div class="dashboard-grid dashboard-grid-secondary">
 
           <a href="{{ url_for('usuarios.listar_usuarios') }}" class="module-card module-card-dark">
-            <div class="module-icon">🔐</div>
-            <div class="module-content">
-              <h3>Usuarios</h3>
-              <p>Administra usuarios y accesos del sistema.</p>
+            <div class="module-icon">
+              <i class="bi bi-person-lock"></i>
             </div>
-            <span class="module-arrow">→</span>
+
+            <div class="module-content">
+              <div class="module-title-row">
+                <h3>Usuarios</h3>
+                <span class="module-status">Admin</span>
+              </div>
+
+              <p>Administra usuarios, roles y accesos del sistema.</p>
+            </div>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
           <a href="{{ url_for('medios_pago.listar_medios_pago') }}" class="module-card module-card-payments">
-            <div class="module-icon">💳</div>
-            <div class="module-content">
-              <h3>Medios de pago</h3>
-              <p>Administra efectivo, transferencias, tarjetas, medios electrónicos y cuentas contables.</p>
+            <div class="module-icon">
+              <i class="bi bi-credit-card-2-front"></i>
             </div>
-            <span class="module-arrow">→</span>
+
+            <div class="module-content">
+              <div class="module-title-row">
+                <h3>Medios de pago</h3>
+                <span class="module-status">Admin</span>
+              </div>
+
+              <p>Administra efectivo, transferencias, tarjetas y cuentas contables.</p>
+            </div>
+
+            <span class="module-arrow">
+              <i class="bi bi-arrow-right"></i>
+            </span>
           </a>
 
         </div>
@@ -190,20 +349,28 @@
            ACCESO LIMITADO
       ========================== -->
       <section class="module-section single-access">
-        <div class="section-header">
-          <div>
-            <h2>Acceso limitado</h2>
-            <p>No tienes módulos administrativos asignados para esta empresa.</p>
-          </div>
-        </div>
 
         <div class="empty-access-card">
-          <div class="empty-icon">🔒</div>
-          <h3>Sin módulos disponibles</h3>
+
+          <div class="empty-icon">
+            <i class="bi bi-shield-lock"></i>
+          </div>
+
+          <span class="section-kicker">Acceso limitado</span>
+
+          <h2>Sin módulos disponibles</h2>
+
           <p>
+            No tienes módulos administrativos asignados para esta empresa.
             Solicita a un administrador que revise tu rol o tu vinculación con la empresa activa.
           </p>
+
+          <a href="{{ url_for('auth.logout') }}" class="btn-empty-logout">
+            Cerrar sesión
+          </a>
+
         </div>
+
       </section>
 
     {% endif %}
@@ -213,18 +380,36 @@
 </div>
 
 <style>
+/* =====================================================
+   FLOWLITE DASHBOARD
+===================================================== */
+
+:root {
+  --flow-primary: #2563eb;
+  --flow-accent: #14b8a6;
+  --flow-dark: #0f172a;
+  --flow-muted: #64748b;
+  --flow-soft: #f8fafc;
+  --flow-bg: #f3f7fb;
+  --flow-card: #ffffff;
+  --flow-border: #e2e8f0;
+  --flow-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+  --flow-shadow-hover: 0 24px 54px rgba(15, 23, 42, 0.14);
+}
+
 /* ==============================
-   DASHBOARD MODERNO
+   PAGE
 ============================== */
 
 .dashboard-page {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(14, 165, 233, 0.10), transparent 32%),
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.12), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(20, 184, 166, 0.12), transparent 28%),
     linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
-  padding: 34px 24px 48px;
+  padding: 34px 24px 52px;
   font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #111827;
+  color: var(--flow-dark);
 }
 
 /* ==============================
@@ -232,58 +417,88 @@
 ============================== */
 
 .dashboard-topbar {
-  max-width: 1180px;
-  margin: 0 auto 34px;
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(12px);
+  max-width: 1240px;
+  margin: 0 auto 24px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
   border: 1px solid rgba(226, 232, 240, 0.95);
-  border-radius: 26px;
+  border-radius: 28px;
   padding: 24px 28px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+  box-shadow: var(--flow-shadow);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 28px;
 }
 
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 20px;
+  min-width: 0;
+}
+
+.logo-box {
+  width: 112px;
+  height: 76px;
+  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  flex-shrink: 0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
 .brand-logo {
-  width: 150px;
-  max-width: 100%;
-  max-height: 86px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
 }
 
-.brand-text h1 {
-  margin: 0 0 6px;
-  color: #222;
-  font-size: clamp(1.7rem, 3vw, 2.4rem);
-  line-height: 1.05;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+.brand-text {
+  min-width: 0;
 }
 
-.brand-text h1 span {
-  color: #0b7cff;
+.eyebrow,
+.section-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--flow-primary);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand-text h1 {
+  margin: 5px 0 4px;
+  color: var(--flow-dark);
+  font-size: clamp(1.85rem, 3vw, 2.65rem);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.055em;
 }
 
 .brand-text p {
   margin: 0;
-  color: #64748b;
-  font-size: 1rem;
+  color: var(--flow-muted);
+  font-size: 0.98rem;
   font-weight: 500;
 }
 
 .brand-text p strong {
-  color: #0f172a;
+  color: var(--flow-dark);
   font-weight: 850;
 }
+
+/* ==============================
+   USER ACTIONS
+============================== */
 
 .user-actions {
   display: flex;
@@ -293,38 +508,70 @@
   flex-shrink: 0;
 }
 
-.role-pill {
+.user-chip {
+  min-height: 48px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--flow-primary), var(--flow-accent));
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 0.95rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #bfdbfe;
-  font-size: 0.84rem;
-  font-weight: 800;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.12;
+}
+
+.user-meta strong {
+  color: var(--flow-dark);
+  font-size: 0.9rem;
+  font-weight: 850;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-meta small {
+  margin-top: 3px;
+  color: var(--flow-primary);
+  font-size: 0.72rem;
+  font-weight: 850;
   letter-spacing: 0.04em;
 }
 
 .btn-logout {
-  min-height: 42px;
-  min-width: 132px;
-  padding: 0 20px;
+  min-height: 46px;
+  padding: 0 18px;
   border-radius: 999px;
   text-decoration: none;
   background: #fff1f2;
   color: #be123c;
   border: 1px solid #fecdd3;
-  font-weight: 800;
-  font-size: 0.92rem;
+  font-weight: 850;
+  font-size: 0.9rem;
   line-height: 1;
-  transition: 0.2s ease;
-
+  transition: 0.18s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   text-align: center;
   white-space: nowrap;
 }
@@ -332,6 +579,7 @@
 .btn-logout:hover {
   background: #ffe4e6;
   color: #9f1239;
+  transform: translateY(-1px);
 }
 
 /* ==============================
@@ -339,12 +587,16 @@
 ============================== */
 
 .dashboard-shell {
-  max-width: 1180px;
+  max-width: 1240px;
   margin: 0 auto;
 }
 
 .module-section {
-  margin-bottom: 34px;
+  margin-top: 28px;
+}
+
+.admin-section {
+  padding-top: 2px;
 }
 
 .section-header {
@@ -352,21 +604,106 @@
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .section-header h2 {
-  margin: 0 0 4px;
-  color: #0f172a;
-  font-size: 1.35rem;
-  font-weight: 850;
-  letter-spacing: -0.02em;
+  margin: 4px 0 3px;
+  color: var(--flow-dark);
+  font-size: 1.32rem;
+  font-weight: 900;
+  letter-spacing: -0.035em;
 }
 
 .section-header p {
   margin: 0;
-  color: #64748b;
-  font-size: 0.96rem;
+  color: var(--flow-muted);
+  font-size: 0.94rem;
+}
+
+/* ==============================
+   QUICK STATS
+============================== */
+
+.quick-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  min-height: 104px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--flow-border);
+  border-radius: 24px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.stat-icon {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+}
+
+.stat-blue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.stat-purple {
+  background: #f3e8ff;
+  color: #9333ea;
+}
+
+.stat-green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.stat-red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.stat-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-info span {
+  color: var(--flow-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.stat-info strong {
+  margin-top: 3px;
+  color: var(--flow-dark);
+  font-size: 1.55rem;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-info small {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 /* ==============================
@@ -375,29 +712,42 @@
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 16px;
+}
+
+.dashboard-grid-main {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-grid-secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 620px;
 }
 
 /* ==============================
-   CARDS
+   MODULE CARDS
 ============================== */
 
 .module-card {
   position: relative;
-  min-height: 148px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e2e8f0;
-  border-radius: 22px;
-  padding: 22px;
+  min-height: 138px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--flow-border);
+  border-radius: 24px;
+  padding: 20px;
   text-decoration: none;
-  color: #111827;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+  color: var(--flow-dark);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 15px;
   overflow: hidden;
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  isolation: isolate;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .module-card::before {
@@ -405,114 +755,104 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: 5px;
-  background: var(--card-color, #0ea5e9);
+  background: var(--card-color, var(--flow-primary));
+  z-index: 1;
 }
 
 .module-card::after {
   content: "";
   position: absolute;
-  right: -32px;
-  bottom: -36px;
-  width: 120px;
-  height: 120px;
+  right: -38px;
+  bottom: -42px;
+  width: 124px;
+  height: 124px;
   border-radius: 999px;
-  background: var(--card-soft, rgba(14, 165, 233, 0.08));
+  background: var(--card-soft, #dbeafe);
+  opacity: 0.82;
+  z-index: -1;
 }
 
 .module-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.13);
-  border-color: var(--card-border, #bae6fd);
+  box-shadow: var(--flow-shadow-hover);
+  border-color: var(--card-border, #bfdbfe);
+  background: #ffffff;
+}
+
+.module-card:hover .module-arrow {
+  transform: translateX(3px);
+  opacity: 1;
 }
 
 .module-icon {
-  width: 54px;
-  height: 54px;
-  min-width: 54px;
-  border-radius: 18px;
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  border-radius: 17px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--card-soft, #e0f2fe);
-  color: var(--card-color, #0284c7);
-  font-size: 1.7rem;
-  z-index: 1;
+  background: var(--card-soft, #dbeafe);
+  color: var(--card-color, var(--flow-primary));
+  font-size: 1.35rem;
+  z-index: 2;
 }
 
 .module-content {
-  z-index: 1;
-  padding-right: 20px;
+  z-index: 2;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.module-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
 }
 
 .module-content h3 {
-  margin: 2px 0 7px;
-  color: #111827;
-  font-size: 1.1rem;
-  font-weight: 850;
-  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--flow-dark);
+  font-size: 1rem;
+  line-height: 1.15;
+  font-weight: 900;
+  letter-spacing: -0.025em;
 }
 
 .module-content p {
   margin: 0;
-  color: #64748b;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  color: var(--flow-muted);
+  font-size: 0.84rem;
+  line-height: 1.42;
+  font-weight: 500;
+}
+
+.module-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #047857;
+  background: #d1fae5;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .module-arrow {
   position: absolute;
   right: 18px;
-  top: 20px;
-  color: var(--card-color, #0284c7);
+  top: 18px;
+  color: var(--card-color, var(--flow-primary));
   font-weight: 900;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   opacity: 0.7;
-  z-index: 2;
-}
-
-/* ==============================
-   EMPTY ACCESS
-============================== */
-
-.single-access {
-  max-width: 520px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.empty-access-card {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e2e8f0;
-  border-radius: 24px;
-  padding: 28px;
-  text-align: center;
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
-}
-
-.empty-icon {
-  width: 62px;
-  height: 62px;
-  border-radius: 20px;
-  margin: 0 auto 14px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.7rem;
-}
-
-.empty-access-card h3 {
-  margin: 0 0 8px;
-  color: #111827;
-  font-size: 1.15rem;
-  font-weight: 900;
-}
-
-.empty-access-card p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.5;
+  z-index: 3;
+  transition: 0.18s ease;
 }
 
 /* ==============================
@@ -525,7 +865,7 @@
   --card-border: #bfdbfe;
 }
 
-.module-card-products {
+.module-card-purple {
   --card-color: #9333ea;
   --card-soft: #f3e8ff;
   --card-border: #e9d5ff;
@@ -568,16 +908,101 @@
 }
 
 /* ==============================
+   EMPTY ACCESS
+============================== */
+
+.single-access {
+  max-width: 560px;
+  margin: 52px auto 0;
+}
+
+.empty-access-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--flow-border);
+  border-radius: 28px;
+  padding: 34px;
+  text-align: center;
+  box-shadow: var(--flow-shadow);
+}
+
+.empty-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 24px;
+  margin: 0 auto 16px;
+  background: #eff6ff;
+  color: var(--flow-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9rem;
+}
+
+.empty-access-card h2 {
+  margin: 8px 0 10px;
+  color: var(--flow-dark);
+  font-size: 1.4rem;
+  font-weight: 950;
+  letter-spacing: -0.035em;
+}
+
+.empty-access-card p {
+  margin: 0 auto;
+  max-width: 430px;
+  color: var(--flow-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.btn-empty-logout {
+  margin-top: 22px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  text-decoration: none;
+  background: var(--flow-primary);
+  color: #ffffff;
+  border: 1px solid var(--flow-primary);
+  font-weight: 850;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.18s ease;
+}
+
+.btn-empty-logout:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* ==============================
    RESPONSIVE
 ============================== */
 
-@media (max-width: 1000px) {
-  .dashboard-grid {
+@media (max-width: 1180px) {
+  .quick-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .dashboard-grid-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid-secondary {
+    max-width: none;
+  }
+}
+
+@media (max-width: 860px) {
   .dashboard-topbar {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .user-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .brand-block {
@@ -585,15 +1010,15 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 680px) {
   .dashboard-page {
-    padding: 22px 14px 38px;
+    padding: 22px 14px 40px;
   }
 
   .dashboard-topbar {
-    flex-direction: column;
-    border-radius: 22px;
+    border-radius: 24px;
     padding: 22px;
+    gap: 20px;
   }
 
   .brand-block {
@@ -601,34 +1026,71 @@
     gap: 14px;
   }
 
-  .brand-logo {
-    width: 130px;
-    max-height: 76px;
+  .logo-box {
+    width: 104px;
+    height: 72px;
+  }
+
+  .brand-text h1 {
+    font-size: 2rem;
+  }
+
+  .brand-text p {
+    font-size: 0.9rem;
   }
 
   .user-actions {
-    width: 100%;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 
-  .role-pill {
-    min-height: 40px;
-  }
-
+  .user-chip,
   .btn-logout {
-    min-height: 40px;
-    min-width: 130px;
-    padding: 0 18px;
+    width: 100%;
+    justify-content: center;
   }
 
-  .dashboard-grid {
+  .quick-stats,
+  .dashboard-grid-main,
+  .dashboard-grid-secondary {
     grid-template-columns: 1fr;
   }
 
+  .stat-card {
+    min-height: 96px;
+  }
+
   .module-card {
-    min-height: 132px;
+    min-height: 128px;
+    border-radius: 22px;
+  }
+
+  .section-header h2 {
+    font-size: 1.22rem;
+  }
+
+  .section-header p {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .module-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .module-content {
+    padding-right: 0;
+  }
+
+  .module-arrow {
+    right: 16px;
+    top: 16px;
   }
 }
 </style>
+
 {% endblock %}
