@@ -270,7 +270,7 @@
         <span>Buscar</span>
         <span>Producto</span>
         <span>Cantidad</span>
-        <span>Valor</span>
+        <span>Valor unitario</span>
         <span></span>
       </div>
 
@@ -278,6 +278,7 @@
 
         {% if editar %}
           {% for d in detalles %}
+            {% set subtotal_detalle = (d.cantidad|float) * (d.valorunitario|float) %}
             <div class="detalle-row" id="detalle_{{ loop.index0 }}">
               <div class="search-wrapper">
                 <span>🔍</span>
@@ -305,6 +306,7 @@
                      name="detalles[{{ loop.index0 }}][cantidad]"
                      value="{{ d.cantidad }}"
                      min="1"
+                     step="0.01"
                      oninput="actualizarSubtotal({{ loop.index0 }})"
                      required>
 
@@ -314,8 +316,13 @@
                      id="valor_{{ loop.index0 }}"
                      value="{{ d.valorunitario }}"
                      data-unitario="{{ d.valorunitario }}"
-                     oninput="actualizarTotales()"
+                     oninput="actualizarSubtotal({{ loop.index0 }})"
                      required>
+
+              <input type="hidden"
+                     name="detalles[{{ loop.index0 }}][subtotal]"
+                     id="subtotal_{{ loop.index0 }}"
+                     value="{{ subtotal_detalle }}">
 
               <button type="button"
                       class="btn-delete"
@@ -351,6 +358,7 @@
                    name="detalles[0][cantidad]"
                    value="1"
                    min="1"
+                   step="0.01"
                    oninput="actualizarSubtotal(0)"
                    required>
 
@@ -360,8 +368,13 @@
                    id="valor_0"
                    value="{{ reserva.precio }}"
                    data-unitario="{{ reserva.precio }}"
-                   oninput="actualizarTotales()"
+                   oninput="actualizarSubtotal(0)"
                    required>
+
+            <input type="hidden"
+                   name="detalles[0][subtotal]"
+                   id="subtotal_0"
+                   value="{{ reserva.precio }}">
 
             <button type="button" class="btn-delete" onclick="eliminarDetalle(0)">
               ✕
@@ -1087,6 +1100,11 @@ function normalizarNumero(valor) {
   return isNaN(numero) ? 0 : numero;
 }
 
+function formatearNumero(valor) {
+  const numero = Number(valor || 0);
+  return numero.toFixed(2);
+}
+
 function obtenerSaldoPendiente() {
   const saldoPendiente = document.getElementById("saldoPendiente");
   return saldoPendiente ? normalizarNumero(saldoPendiente.innerText || saldoPendiente.textContent) : 0;
@@ -1151,11 +1169,11 @@ function validarSaldoSeguro() {
 }
 
 function toggleModo(modo) {
-  const reservaSection = document.getElementById('reserva-section');
-  const manualSection = document.getElementById('manual-section');
+  const reservaSection = document.getElementById("reserva-section");
+  const manualSection = document.getElementById("manual-section");
 
-  if (reservaSection) reservaSection.style.display = (modo === 'reserva') ? 'block' : 'none';
-  if (manualSection) manualSection.style.display = (modo === 'manual') ? 'block' : 'none';
+  if (reservaSection) reservaSection.style.display = (modo === "reserva") ? "block" : "none";
+  if (manualSection) manualSection.style.display = (modo === "manual") ? "block" : "none";
 }
 
 async function cargarProductosYMedios() {
@@ -1172,44 +1190,80 @@ async function cargarProductosYMedios() {
 }
 
 function addDetalle() {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.classList.add("detalle-row");
   div.setAttribute("id", `detalle_${detalleIndex}`);
 
   let options = '<option value="">Selecciona producto</option>';
+
   productos.forEach(p => {
     const label = `${p.codigo} · ${p.nombre}`;
-    options += `<option value="${p.idproducto}" data-precio="${p.precio}" data-codigo="${p.codigo}">${label}</option>`;
+    options += `
+      <option value="${p.idproducto}"
+              data-precio="${p.precio}"
+              data-codigo="${p.codigo}">
+        ${label}
+      </option>
+    `;
   });
 
   div.innerHTML = `
     <div class="search-wrapper">
       <span>🔍</span>
-      <input type="text" id="search_${detalleIndex}" placeholder="Código o nombre" onkeyup="filtrarProductos(${detalleIndex})">
+      <input type="text"
+             id="search_${detalleIndex}"
+             placeholder="Código o nombre"
+             onkeyup="filtrarProductos(${detalleIndex})">
     </div>
 
-    <select name="detalles[${detalleIndex}][idproducto]" id="producto_${detalleIndex}"
-            onchange="setPrecio(this, ${detalleIndex})" required>
+    <select name="detalles[${detalleIndex}][idproducto]"
+            id="producto_${detalleIndex}"
+            onchange="setPrecio(this, ${detalleIndex})"
+            required>
       ${options}
     </select>
 
-    <input type="number" name="detalles[${detalleIndex}][cantidad]" value="1" min="1"
-           oninput="actualizarSubtotal(${detalleIndex})" required>
+    <input type="number"
+           name="detalles[${detalleIndex}][cantidad]"
+           value="1"
+           min="1"
+           step="0.01"
+           oninput="actualizarSubtotal(${detalleIndex})"
+           required>
 
-    <input type="number" step="0.01" name="detalles[${detalleIndex}][valorunitario]"
-           id="valor_${detalleIndex}" oninput="actualizarTotales()" required>
+    <input type="number"
+           step="0.01"
+           name="detalles[${detalleIndex}][valorunitario]"
+           id="valor_${detalleIndex}"
+           data-unitario="0"
+           oninput="actualizarSubtotal(${detalleIndex})"
+           required>
 
-    <button type="button" class="btn-delete" onclick="eliminarDetalle(${detalleIndex})">✕</button>
+    <input type="hidden"
+           name="detalles[${detalleIndex}][subtotal]"
+           id="subtotal_${detalleIndex}"
+           value="0">
+
+    <button type="button"
+            class="btn-delete"
+            onclick="eliminarDetalle(${detalleIndex})">
+      ✕
+    </button>
   `;
 
   document.getElementById("detalles").appendChild(div);
   detalleIndex++;
+
+  actualizarTotales();
 }
 
 function filtrarProductos(index) {
   const input = document.getElementById(`search_${index}`);
-  const filtro = input.value.toUpperCase();
   const select = document.getElementById(`producto_${index}`);
+
+  if (!input || !select) return;
+
+  const filtro = input.value.toUpperCase();
   const opciones = select.getElementsByTagName("option");
   let matchExacto = null;
 
@@ -1217,8 +1271,12 @@ function filtrarProductos(index) {
     const texto = opciones[i].textContent.toUpperCase();
     const codigo = opciones[i].dataset.codigo ? opciones[i].dataset.codigo.toUpperCase() : "";
     const coincide = texto.includes(filtro) || codigo.includes(filtro);
+
     opciones[i].style.display = coincide ? "" : "none";
-    if (codigo === filtro) matchExacto = opciones[i];
+
+    if (filtro && codigo === filtro) {
+      matchExacto = opciones[i];
+    }
   }
 
   if (matchExacto) {
@@ -1229,18 +1287,23 @@ function filtrarProductos(index) {
 
 function eliminarDetalle(i) {
   const row = document.getElementById(`detalle_${i}`);
-  if (row) row.remove();
+
+  if (row) {
+    row.remove();
+  }
+
   actualizarTotales();
 }
 
 function setPrecio(selectElem, index) {
   const selected = selectElem.options[selectElem.selectedIndex];
-  const precio = selected ? selected.dataset.precio || 0 : 0;
+  const precio = selected ? normalizarNumero(selected.dataset.precio || 0) : 0;
 
-  const valorInput = document.querySelector(`#valor_${index}`);
+  const valorInput = document.getElementById(`valor_${index}`);
+
   if (!valorInput) return;
 
-  valorInput.value = precio;
+  valorInput.value = formatearNumero(precio);
   valorInput.dataset.unitario = precio;
 
   actualizarSubtotal(index);
@@ -1249,68 +1312,120 @@ function setPrecio(selectElem, index) {
 function actualizarSubtotal(i) {
   const cantidadInput = document.querySelector(`input[name="detalles[${i}][cantidad]"]`);
   const valorInput = document.getElementById(`valor_${i}`);
+  const subtotalInput = document.getElementById(`subtotal_${i}`);
 
   if (!cantidadInput || !valorInput) return;
 
-  const cantidad = parseFloat(cantidadInput.value) || 1;
-  const precioUnitario = parseFloat(valorInput.dataset.unitario || valorInput.value || 0);
+  const cantidad = normalizarNumero(cantidadInput.value || 0);
+  const valorUnitario = normalizarNumero(valorInput.value || 0);
+  const subtotal = cantidad * valorUnitario;
 
-  valorInput.value = (precioUnitario * cantidad).toFixed(2);
+  if (subtotalInput) {
+    subtotalInput.value = formatearNumero(subtotal);
+  }
+
+  /*
+    Importante:
+    No sobrescribir valorInput con cantidad * valor.
+    valorInput siempre debe representar valor unitario.
+  */
 
   actualizarTotales();
 }
 
 function addPago() {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.classList.add("pago-row");
   div.setAttribute("id", `pago_${pagoIndex}`);
 
   let options = '<option value="">Medio</option>';
+
   medios.forEach(m => {
     options += `<option value="${m.idmedio}">${m.nombre}</option>`;
   });
 
   div.innerHTML = `
     <select name="pagos[${pagoIndex}][idmedio]">${options}</select>
-    <input type="number" step="0.01" name="pagos[${pagoIndex}][valor]" placeholder="Valor" oninput="actualizarTotales()">
-    <input type="date" name="pagos[${pagoIndex}][due_date]" value="{{ datetime.now().strftime('%Y-%m-%d') }}">
-    <button type="button" class="btn-delete" onclick="eliminarPago(${pagoIndex})">✕</button>
+
+    <input type="number"
+           step="0.01"
+           name="pagos[${pagoIndex}][valor]"
+           placeholder="Valor"
+           oninput="actualizarTotales()">
+
+    <input type="date"
+           name="pagos[${pagoIndex}][due_date]"
+           value="{{ datetime.now().strftime('%Y-%m-%d') }}">
+
+    <button type="button"
+            class="btn-delete"
+            onclick="eliminarPago(${pagoIndex})">
+      ✕
+    </button>
   `;
 
   document.getElementById("pagos").appendChild(div);
   pagoIndex++;
+
+  actualizarTotales();
 }
 
 function eliminarPago(i) {
   const row = document.getElementById(`pago_${i}`);
-  if (row) row.remove();
+
+  if (row) {
+    row.remove();
+  }
+
   actualizarTotales();
 }
 
 function actualizarTotales() {
   let total = 0;
 
-  document.querySelectorAll("[id^=valor_]").forEach(input => {
-    total += parseFloat(input.value) || 0;
+  document.querySelectorAll(".detalle-row").forEach(row => {
+    const id = row.id.replace("detalle_", "");
+
+    const cantidadInput = document.querySelector(`input[name="detalles[${id}][cantidad]"]`);
+    const valorInput = document.getElementById(`valor_${id}`);
+    const subtotalInput = document.getElementById(`subtotal_${id}`);
+
+    const cantidad = normalizarNumero(cantidadInput ? cantidadInput.value : 0);
+    const valorUnitario = normalizarNumero(valorInput ? valorInput.value : 0);
+    const subtotal = cantidad * valorUnitario;
+
+    if (subtotalInput) {
+      subtotalInput.value = formatearNumero(subtotal);
+    }
+
+    total += subtotal;
   });
 
   const totalFactura = document.getElementById("totalFactura");
-  if (totalFactura) totalFactura.innerText = total.toFixed(2);
+
+  if (totalFactura) {
+    totalFactura.innerText = formatearNumero(total);
+  }
 
   let pagado = 0;
 
   document.querySelectorAll(".pago-row input[name*='[valor]']").forEach(input => {
-    pagado += parseFloat(input.value) || 0;
+    pagado += normalizarNumero(input.value || 0);
   });
 
   const totalPagado = document.getElementById("totalPagado");
-  if (totalPagado) totalPagado.innerText = pagado.toFixed(2);
+
+  if (totalPagado) {
+    totalPagado.innerText = formatearNumero(pagado);
+  }
 
   const saldo = total - pagado;
   const saldoPendiente = document.getElementById("saldoPendiente");
   const saldoCard = document.getElementById("saldoCard");
 
-  if (saldoPendiente) saldoPendiente.innerText = saldo.toFixed(2);
+  if (saldoPendiente) {
+    saldoPendiente.innerText = formatearNumero(saldo);
+  }
 
   if (saldoCard) {
     if (saldo <= 0) {
@@ -1321,6 +1436,15 @@ function actualizarTotales() {
   }
 
   controlarBotonEnviarFactura();
+}
+
+function reconstruirSubtotalesIniciales() {
+  document.querySelectorAll(".detalle-row").forEach(row => {
+    const id = row.id.replace("detalle_", "");
+    actualizarSubtotal(id);
+  });
+
+  actualizarTotales();
 }
 
 function construirPayloadDesdeFormulario() {
@@ -1336,18 +1460,28 @@ function construirPayloadDesdeFormulario() {
 
   fd.forEach((value, key) => {
     const match = key.match(/detalles\[(\d+)\]\[(.*?)\]/);
+
     if (match) {
       const index = match[1];
-      if (!data.detalles[index]) data.detalles[index] = {};
+
+      if (!data.detalles[index]) {
+        data.detalles[index] = {};
+      }
+
       data.detalles[index][match[2]] = value;
     }
   });
 
   fd.forEach((value, key) => {
     const match = key.match(/pagos\[(\d+)\]\[(.*?)\]/);
+
     if (match) {
       const index = match[1];
-      if (!data.pagos[index]) data.pagos[index] = {};
+
+      if (!data.pagos[index]) {
+        data.pagos[index] = {};
+      }
+
       data.pagos[index][match[2]] = value;
     }
   });
@@ -1514,11 +1648,16 @@ async function cargarReserva() {
     detalle.innerHTML = `
       <div class="search-wrapper">
         <span>🔍</span>
-        <input type="text" id="search_0" placeholder="Código o nombre" onkeyup="filtrarProductos(0)">
+        <input type="text"
+               id="search_0"
+               placeholder="Código o nombre"
+               onkeyup="filtrarProductos(0)">
       </div>
 
-      <select name="detalles[0][idproducto]" id="producto_0"
-              onchange="setPrecio(this, 0)" required>
+      <select name="detalles[0][idproducto]"
+              id="producto_0"
+              onchange="setPrecio(this, 0)"
+              required>
         <option value="${r.idproducto}"
                 data-precio="${r.precio}"
                 selected>
@@ -1526,18 +1665,33 @@ async function cargarReserva() {
         </option>
       </select>
 
-      <input type="number" name="detalles[0][cantidad]"
-             value="1" min="1"
-             oninput="actualizarSubtotal(0)" required>
+      <input type="number"
+             name="detalles[0][cantidad]"
+             value="1"
+             min="1"
+             step="0.01"
+             oninput="actualizarSubtotal(0)"
+             required>
 
-      <input type="number" step="0.01"
+      <input type="number"
+             step="0.01"
              name="detalles[0][valorunitario]"
              id="valor_0"
              value="${r.precio}"
              data-unitario="${r.precio}"
-             oninput="actualizarTotales()" required>
+             oninput="actualizarSubtotal(0)"
+             required>
 
-      <button type="button" class="btn-delete" onclick="eliminarDetalle(0)">✕</button>
+      <input type="hidden"
+             name="detalles[0][subtotal]"
+             id="subtotal_0"
+             value="${r.precio}">
+
+      <button type="button"
+              class="btn-delete"
+              onclick="eliminarDetalle(0)">
+        ✕
+      </button>
     `;
 
     detallesDiv.appendChild(detalle);
@@ -1553,19 +1707,16 @@ async function cargarReserva() {
       <input type="hidden" name="pagos[0][idmedio]" value="${r.idmedio}">
       <input type="text" value="${r.medio}" readonly>
       <input type="number" step="0.01" name="pagos[0][valor]" value="${r.abono}" readonly>
-      <input type="date" name="pagos[0][due_date]" value="${new Date().toISOString().split('T')[0]}" readonly>
+      <input type="date" name="pagos[0][due_date]" value="${new Date().toISOString().split("T")[0]}" readonly>
       <span></span>
     `;
 
     pagosDiv.appendChild(pago);
 
-    document.getElementById("totalFactura").innerText = parseFloat(r.precio || 0).toFixed(2);
-    document.getElementById("totalPagado").innerText = parseFloat(r.abono || 0).toFixed(2);
-    document.getElementById("saldoPendiente").innerText = ((parseFloat(r.precio || 0)) - (parseFloat(r.abono || 0))).toFixed(2);
-
     detalleIndex = 1;
     pagoIndex = 1;
-    actualizarTotales();
+
+    reconstruirSubtotalesIniciales();
 
   } catch (err) {
     console.error("Error cargando reserva:", err);
@@ -1578,10 +1729,13 @@ function enviarPrefacturaSiigo() {
     return;
   }
 
-  const flag = document.getElementById('enviarFlag');
-  if (flag) flag.value = 'true';
+  const flag = document.getElementById("enviarFlag");
 
-  const form = document.querySelector('#invoiceForm');
+  if (flag) {
+    flag.value = "true";
+  }
+
+  const form = document.querySelector("#invoiceForm");
 
   if (form) {
     if (form.dataset.submitted === "true") {
@@ -1602,7 +1756,7 @@ function enviarPrefacturaSiigo() {
 
 document.addEventListener("DOMContentLoaded", function () {
   cargarProductosYMedios();
-  actualizarTotales();
+  reconstruirSubtotalesIniciales();
   controlarBotonEnviarFactura();
 
   document.addEventListener("keydown", function (event) {
