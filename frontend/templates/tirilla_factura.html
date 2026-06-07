@@ -80,6 +80,7 @@
 
     .row,
     .total-row,
+    .grand-total-row,
     .item-detail {
       display: flex;
       justify-content: space-between;
@@ -107,9 +108,17 @@
     }
 
     .total-row {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       margin-top: 2mm;
+    }
+
+    .grand-total-row {
+      font-size: 14px;
+      font-weight: 900;
+      margin-top: 2mm;
+      padding-top: 1mm;
+      border-top: 1px solid #000;
     }
 
     .no-print {
@@ -240,45 +249,30 @@
     <div class="line"></div>
 
     <!-- TOTALES -->
-    {% set total_pagado = factura.pagos|sum(attribute='valor') if factura.pagos else 0 %}
-    {% set saldo = (factura.total or 0) - total_pagado %}
+    {% set total_base = factura.total|float if factura.total else 0 %}
+    {% set servicio = total_base * 0.10 %}
+    {% set total_con_servicio = total_base + servicio %}
 
     <div class="total-row">
       <span>TOTAL</span>
-      <span>${{ "{:,.0f}".format(factura.total|float).replace(",", ".") }}</span>
-    </div>
-
-    <div class="row">
-      <span class="label">Pagado:</span>
-      <span class="value">
-        ${{ "{:,.0f}".format(total_pagado|float).replace(",", ".") }}
+      <span>
+        ${{ "{:,.0f}".format(total_base).replace(",", ".") }}
       </span>
     </div>
 
     <div class="row">
-      <span class="label">Saldo:</span>
+      <span class="label">Servicio 10%:</span>
       <span class="value">
-        ${{ "{:,.0f}".format(saldo|float).replace(",", ".") }}
+        ${{ "{:,.0f}".format(servicio).replace(",", ".") }}
       </span>
     </div>
 
-    <div class="line"></div>
-
-    <!-- PAGOS -->
-    <div class="bold">PAGOS</div>
-
-    {% if factura.pagos %}
-      {% for p in factura.pagos %}
-        <div class="row">
-          <span class="label">{{ p.medio or p.idmedio or "Medio" }}</span>
-          <span class="value">
-            ${{ "{:,.0f}".format(p.valor|float).replace(",", ".") }}
-          </span>
-        </div>
-      {% endfor %}
-    {% else %}
-      <div class="small">Sin pagos registrados.</div>
-    {% endif %}
+    <div class="grand-total-row">
+      <span>TOTAL + SERVICIO</span>
+      <span>
+        ${{ "{:,.0f}".format(total_con_servicio).replace(",", ".") }}
+      </span>
+    </div>
 
     <div class="line"></div>
 
