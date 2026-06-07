@@ -7,7 +7,7 @@ import { authJwt } from "./authJwt.js";
 const router = express.Router();
 
 // =====================================================
-// RUTA PÚBLICA: Crear primer usuario administrador
+// RUTA PÚBLICA: Crear primer usuario administrador por empresa
 // POST /api/usuarios/bootstrap
 // =====================================================
 router.post("/bootstrap", async (req, res) => {
@@ -38,7 +38,6 @@ router.post("/bootstrap", async (req, res) => {
       });
     }
 
-    console.log("🟡 [BOOTSTRAP] Solicitando conexión...");
     client = await getConnection();
     console.log("✅ [BOOTSTRAP] Conexión obtenida");
 
@@ -68,21 +67,74 @@ router.post("/bootstrap", async (req, res) => {
       });
     }
 
-    // Validar si ya existen usuarios
-    const totalUsuariosResult = await client.query(`
-      SELECT COUNT(*)::int AS total
-      FROM usuarios
-    `);
+    // Validar si la empresa ya tiene un usuario administrador activo
+    const adminEmpresaResult = await client.query(
+      `
+      SELECT 
+        ue.idusuario_empresa,
+        ue.idusuario,
+        u.username,
+        ue.rol_empresa
+      FROM usuario_empresa ue
+      INNER JOIN usuarios u 
+        ON u.idusuario = ue.idusuario
+      WHERE ue.idempresa = $1
+        AND ue.activo = true
+        AND u.activo = true
+        AND UPPER(ue.rol_empresa) = 'ADMIN'
+      LIMIT 1
+      `,
+      [idempresa]
+    );
 
-    const totalUsuarios = totalUsuariosResult.rows[0].total;
+    console.log("✅ [BOOTSTRAP] Admin empresa result:", adminEmpresaResult.rows);
 
-    console.log("✅ [BOOTSTRAP] Total usuarios:", totalUsuarios);
-
-    if (totalUsuarios > 0) {
+    if (adminEmpresaResult.rows.length > 0) {
       return res.status(403).json({
         success: false,
-        error: "Bootstrap deshabilitado. Ya existen usuarios en el sistema."
+        error: "Bootstrap deshabilitado. La empresa ya tiene un usuario administrador.",
+        admin_existente: {
+          idusuario: adminEmpresaResult.rows[0].idusuario,
+          username: adminEmpresaResult.rows[0].username,
+          rol_empresa: adminEmpresaResult.rows[0].rol_empresa
+        }
       });
+    }
+
+    // Validar username global duplicado
+    const usernameResult = await client.query(
+      `
+      SELECT idusuario, username
+      FROM usuarios
+      WHERE LOWER(username) = LOWER($1)
+      `,
+      [username]
+    );
+
+    if (usernameResult.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: "Ya existe un usuario con ese username"
+      });
+    }
+
+    // Validar email duplicado si viene informado
+    if (email) {
+      const emailResult = await client.query(
+        `
+        SELECT idusuario, email
+        FROM usuarios
+        WHERE LOWER(email) = LOWER($1)
+        `,
+        [email]
+      );
+
+      if (emailResult.rows.length > 0) {
+        return res.status(409).json({
+          success: false,
+          error: "Ya existe un usuario con ese email"
+        });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(passwordhash, 10);
