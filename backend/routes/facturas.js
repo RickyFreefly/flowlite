@@ -22,6 +22,32 @@ function limpiarTexto(value) {
   return String(value).trim();
 }
 
+function normalizarValor(value) {
+  const numero = Number(value);
+  if (!Number.isFinite(numero)) return 0;
+  return Math.round(numero * 100) / 100;
+}
+
+function normalizarIdEntero(value) {
+  const numero = Number(value);
+  if (!Number.isInteger(numero) || numero <= 0) return null;
+  return numero;
+}
+
+function normalizarIdEmpresa(req) {
+  const idempresa = req.idempresa ?? req.headers["x-empresa-id"];
+
+  if (idempresa === null || idempresa === undefined) {
+    return "";
+  }
+
+  return String(idempresa).trim();
+}
+
+function obtenerIdUsuario(req) {
+  return normalizarIdEntero(req.user?.idusuario || req.user?.id);
+}
+
 function normalizarIdsNumericos(values = []) {
   return [
     ...new Set(
@@ -32,14 +58,37 @@ function normalizarIdsNumericos(values = []) {
   ];
 }
 
-function normalizarIdsTexto(values = []) {
-  return [
-    ...new Set(
-      values
-        .filter((v) => v !== null && v !== undefined && String(v).trim() !== "")
-        .map((v) => String(v).trim())
-    ),
-  ];
+function normalizarDetalleEntrada(detalle) {
+  const idproducto = normalizarIdEntero(detalle?.idproducto);
+  const cantidad = normalizarValor(detalle?.cantidad || 1);
+  const valorunitario = normalizarValor(detalle?.valorunitario || detalle?.precio || 0);
+
+  return {
+    ...detalle,
+    idproducto,
+    cantidad,
+    valorunitario,
+    descripcion: limpiarTexto(detalle?.descripcion) || null,
+    descuento: normalizarValor(detalle?.descuento || 0),
+    impuesto_id: detalle?.impuesto_id ? normalizarIdEntero(detalle.impuesto_id) : null,
+    impuesto_valor: normalizarValor(detalle?.impuesto_valor || 0),
+  };
+}
+
+function normalizarPagoEntrada(pago) {
+  const idmedio = normalizarIdEntero(pago?.idmedio || pago?.idmedio_pago);
+  const valor = normalizarValor(pago?.valor || 0);
+
+  return {
+    ...pago,
+    idmedio,
+    valor,
+    due_date:
+      pago?.due_date && limpiarTexto(pago.due_date) !== ""
+        ? limpiarTexto(pago.due_date)
+        : null,
+    siigo_pago_id: pago?.siigo_pago_id || null,
+  };
 }
 
 function construirObservaciones(observaciones, detallesDB = []) {
@@ -71,6 +120,8 @@ function construirObservaciones(observaciones, detallesDB = []) {
 
   return observacionesFinal;
 }
+
+// ================== HELPERS DB ==================
 
 async function obtenerClienteEmpresa(idcliente, idempresa) {
   const result = await query(
@@ -112,7 +163,7 @@ async function obtenerProductosEmpresa(detalles, idempresa) {
 }
 
 async function obtenerMediosPagoEmpresa(pagos, idempresa) {
-  const idsMedios = normalizarIdsTexto(pagos.map((p) => p.idmedio));
+  const idsMedios = normalizarIdsNumericos(pagos.map((p) => p.idmedio));
 
   if (idsMedios.length === 0) {
     return [];
@@ -126,7 +177,7 @@ async function obtenerMediosPagoEmpresa(pagos, idempresa) {
       nombre
     FROM public.medios_pago
     WHERE idempresa = $1
-      AND idmedio = ANY($2::text[])
+      AND idmedio = ANY($2::int[])
     `,
     [idempresa, idsMedios]
   );
@@ -136,20 +187,20 @@ async function obtenerMediosPagoEmpresa(pagos, idempresa) {
 
 function recalcularDetalles(detalles, productosMap) {
   return detalles.map((d) => {
-    const idproducto = Number(d.idproducto);
+    const idproducto = normalizarIdEntero(d.idproducto);
     const producto = productosMap[idproducto] || {};
 
     let precioUnitario = 0;
 
     // Producto código 011: valor libre.
     if (producto.codigo === "011") {
-      precioUnitario = Number(d.valorunitario) || 0;
+      precioUnitario = normalizarValor(d.valorunitario);
     } else {
-      precioUnitario = Number(producto.precio) || 0;
+      precioUnitario = normalizarValor(producto.precio);
     }
 
-    const cantidad = Number(d.cantidad || 1);
-    const subtotal = precioUnitario * cantidad;
+    const cantidad = normalizarValor(d.cantidad || 1);
+    const subtotal = normalizarValor(precioUnitario * cantidad);
 
     return {
       ...d,
@@ -158,6 +209,9 @@ function recalcularDetalles(detalles, productosMap) {
       valorunitario: precioUnitario,
       subtotal,
       descripcion: d.descripcion || null,
+      descuento: normalizarValor(d.descuento || 0),
+      impuesto_id: d.impuesto_id || null,
+      impuesto_valor: normalizarValor(d.impuesto_valor || 0),
     };
   });
 }
@@ -278,6 +332,55 @@ async function obtenerDescripcionesDetalles(idfactura, idempresa) {
   return detallesDB.rows;
 }
 
+function validarPayloadFactura({ idcliente, detalles, pagos }) {
+  const idclienteLimpio = normalizarIdEntero(idcliente);
+
+  if (!idclienteLimpio) {
+    return {
+      ok: false,
+      error: "Cliente inválido",
+    };
+  }
+
+  if (!Array.isArray(detalles) || detalles.length === 0) {
+    return {
+      ok: false,
+      error: "Debes agregar al menos un producto",
+    };
+  }
+
+  const detallesNormalizados = detalles
+    .map(normalizarDetalleEntrada)
+    .filter((d) => d.idproducto && d.cantidad > 0);
+
+  if (detallesNormalizados.length === 0) {
+    return {
+      ok: false,
+      error: "Los productos enviados no son válidos",
+    };
+  }
+
+  const pagosNormalizados = Array.isArray(pagos)
+    ? pagos.map(normalizarPagoEntrada).filter((p) => p.valor > 0)
+    : [];
+
+  const pagoSinMedio = pagosNormalizados.find((p) => !p.idmedio);
+
+  if (pagoSinMedio) {
+    return {
+      ok: false,
+      error: "Todos los pagos deben tener un medio de pago válido",
+    };
+  }
+
+  return {
+    ok: true,
+    idcliente: idclienteLimpio,
+    detalles: detallesNormalizados,
+    pagos: pagosNormalizados,
+  };
+}
+
 // ================== SIIGO ==================
 
 async function enviarAFacturaSiigo(siigoPayload, reintentos = 3) {
@@ -333,6 +436,9 @@ async function enviarAFacturaSiigo(siigoPayload, reintentos = 3) {
 
 router.post("/", async (req, res) => {
   try {
+    const idempresa = normalizarIdEmpresa(req);
+    const idusuario = obtenerIdUsuario(req);
+
     const {
       idcliente,
       detalles = [],
@@ -340,14 +446,38 @@ router.post("/", async (req, res) => {
       observaciones = "",
     } = req.body;
 
-    if (!idcliente || !Array.isArray(detalles) || detalles.length === 0) {
+    if (!idempresa) {
       return res.status(400).json({
         success: false,
-        error: "Cliente y detalles son obligatorios",
+        error: "No hay empresa activa",
       });
     }
 
-    const cliente = await obtenerClienteEmpresa(idcliente, req.idempresa);
+    if (!idusuario) {
+      return res.status(400).json({
+        success: false,
+        error: "Usuario inválido",
+      });
+    }
+
+    const validacion = validarPayloadFactura({
+      idcliente,
+      detalles,
+      pagos,
+    });
+
+    if (!validacion.ok) {
+      return res.status(400).json({
+        success: false,
+        error: validacion.error,
+      });
+    }
+
+    const idclienteLimpio = validacion.idcliente;
+    const detallesNormalizados = validacion.detalles;
+    const pagosNormalizados = validacion.pagos;
+
+    const cliente = await obtenerClienteEmpresa(idclienteLimpio, idempresa);
 
     if (!cliente) {
       return res.status(404).json({
@@ -356,8 +486,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const idsProductos = normalizarIdsNumericos(detalles.map((d) => d.idproducto));
-    const productos = await obtenerProductosEmpresa(detalles, req.idempresa);
+    const idsProductos = normalizarIdsNumericos(detallesNormalizados.map((d) => d.idproducto));
+    const productos = await obtenerProductosEmpresa(detallesNormalizados, idempresa);
 
     if (productos.length !== idsProductos.length) {
       return res.status(400).json({
@@ -377,11 +507,10 @@ router.post("/", async (req, res) => {
       ])
     );
 
-    const detallesRecalculados = recalcularDetalles(detalles, productosMap);
+    const detallesRecalculados = recalcularDetalles(detallesNormalizados, productosMap);
 
-    const totalFactura = detallesRecalculados.reduce(
-      (acc, d) => acc + Number(d.subtotal || 0),
-      0
+    const totalFactura = normalizarValor(
+      detallesRecalculados.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
     );
 
     if (totalFactura <= 0) {
@@ -391,10 +520,10 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const idsMedios = normalizarIdsTexto(pagos.map((p) => p.idmedio));
-    const medios = await obtenerMediosPagoEmpresa(pagos, req.idempresa);
+    const idsMedios = normalizarIdsNumericos(pagosNormalizados.map((p) => p.idmedio));
+    const medios = await obtenerMediosPagoEmpresa(pagosNormalizados, idempresa);
 
-    if (pagos.length > 0 && medios.length !== idsMedios.length) {
+    if (pagosNormalizados.length > 0 && medios.length !== idsMedios.length) {
       return res.status(400).json({
         success: false,
         error: "Uno o más medios de pago no pertenecen a la empresa activa",
@@ -420,37 +549,36 @@ router.post("/", async (req, res) => {
       RETURNING *
       `,
       [
-        req.idempresa,
-        idcliente,
+        idempresa,
+        idclienteLimpio,
         totalFactura,
-        req.user.idusuario,
+        idusuario,
       ]
     );
 
     const factura = resultFactura.rows[0];
 
     await registrarDetallesFactura({
-      idempresa: req.idempresa,
+      idempresa,
       idfactura: factura.idfactura,
       detalles: detallesRecalculados,
     });
 
     await registrarPagosFactura({
-      idempresa: req.idempresa,
+      idempresa,
       idfactura: factura.idfactura,
-      pagos,
+      pagos: pagosNormalizados,
     });
 
     const detallesDB = await obtenerDescripcionesDetalles(
       factura.idfactura,
-      req.idempresa
+      idempresa
     );
 
     const observacionesFinal = construirObservaciones(observaciones, detallesDB);
 
-    const totalPagos = pagos.reduce(
-      (acc, p) => acc + Number(p.valor || 0),
-      0
+    const totalPagos = normalizarValor(
+      pagosNormalizados.reduce((acc, p) => acc + Number(p.valor || 0), 0)
     );
 
     const totalGeneral = totalPagos > 0 ? totalPagos : totalFactura;
@@ -458,7 +586,7 @@ router.post("/", async (req, res) => {
     const siigoPayload = buildSiigoStylePayload({
       cliente,
       detalles: detallesRecalculados,
-      pagos,
+      pagos: pagosNormalizados,
       total: totalGeneral,
       observaciones: observacionesFinal,
       productosMap,
@@ -496,7 +624,7 @@ router.post("/", async (req, res) => {
           siigoResponseData.public_url,
           siigoResponseData.stamp?.cufe || null,
           factura.idfactura,
-          req.idempresa,
+          idempresa,
         ]
       );
     } catch (err) {
@@ -513,7 +641,7 @@ router.post("/", async (req, res) => {
           WHERE idfactura = $1
             AND idempresa = $2
           `,
-          [factura.idfactura, req.idempresa]
+          [factura.idfactura, idempresa]
         );
 
         mensaje = "Factura guardada localmente. Siigo está fuera de servicio.";
@@ -558,6 +686,7 @@ router.post("/", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error creando factura",
+      detail: error.message,
     });
   }
 });
@@ -566,6 +695,15 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
+    const idempresa = normalizarIdEmpresa(req);
+
+    if (!idempresa) {
+      return res.status(400).json({
+        success: false,
+        error: "No hay empresa activa",
+      });
+    }
+
     const {
       cliente,
       estado,
@@ -578,7 +716,7 @@ router.get("/", async (req, res) => {
     const offset = (currentPage - 1) * currentPerPage;
 
     const whereClauses = ["f.idempresa = $1"];
-    const params = [req.idempresa];
+    const params = [idempresa];
     let idx = 2;
 
     if (cliente) {
@@ -590,13 +728,13 @@ router.get("/", async (req, res) => {
           OR c.identificacion ILIKE $${idx}
         )
       `);
-      params.push(`%${cliente}%`);
+      params.push(`%${limpiarTexto(cliente)}%`);
       idx++;
     }
 
     if (estado) {
       whereClauses.push(`f.estado = $${idx}`);
-      params.push(estado);
+      params.push(limpiarTexto(estado).toUpperCase());
       idx++;
     }
 
@@ -658,6 +796,7 @@ router.get("/", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error al obtener facturas",
+      detail: error.message,
     });
   }
 });
@@ -666,6 +805,9 @@ router.get("/", async (req, res) => {
 
 router.post("/prefactura", async (req, res) => {
   try {
+    const idempresa = normalizarIdEmpresa(req);
+    const idusuario = obtenerIdUsuario(req);
+
     const {
       idcliente,
       detalles = [],
@@ -673,14 +815,38 @@ router.post("/prefactura", async (req, res) => {
       observaciones = "",
     } = req.body;
 
-    if (!idcliente || !Array.isArray(detalles) || detalles.length === 0) {
+    if (!idempresa) {
       return res.status(400).json({
         success: false,
-        error: "Cliente y detalles son obligatorios",
+        error: "No hay empresa activa",
       });
     }
 
-    const cliente = await obtenerClienteEmpresa(idcliente, req.idempresa);
+    if (!idusuario) {
+      return res.status(400).json({
+        success: false,
+        error: "Usuario inválido",
+      });
+    }
+
+    const validacion = validarPayloadFactura({
+      idcliente,
+      detalles,
+      pagos,
+    });
+
+    if (!validacion.ok) {
+      return res.status(400).json({
+        success: false,
+        error: validacion.error,
+      });
+    }
+
+    const idclienteLimpio = validacion.idcliente;
+    const detallesNormalizados = validacion.detalles;
+    const pagosNormalizados = validacion.pagos;
+
+    const cliente = await obtenerClienteEmpresa(idclienteLimpio, idempresa);
 
     if (!cliente) {
       return res.status(404).json({
@@ -689,8 +855,8 @@ router.post("/prefactura", async (req, res) => {
       });
     }
 
-    const idsProductos = normalizarIdsNumericos(detalles.map((d) => d.idproducto));
-    const productos = await obtenerProductosEmpresa(detalles, req.idempresa);
+    const idsProductos = normalizarIdsNumericos(detallesNormalizados.map((d) => d.idproducto));
+    const productos = await obtenerProductosEmpresa(detallesNormalizados, idempresa);
 
     if (productos.length !== idsProductos.length) {
       return res.status(400).json({
@@ -710,11 +876,10 @@ router.post("/prefactura", async (req, res) => {
       ])
     );
 
-    const detallesRecalculados = recalcularDetalles(detalles, productosMap);
+    const detallesRecalculados = recalcularDetalles(detallesNormalizados, productosMap);
 
-    const totalFactura = detallesRecalculados.reduce(
-      (acc, d) => acc + Number(d.subtotal || 0),
-      0
+    const totalFactura = normalizarValor(
+      detallesRecalculados.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
     );
 
     if (totalFactura <= 0) {
@@ -724,10 +889,10 @@ router.post("/prefactura", async (req, res) => {
       });
     }
 
-    const idsMedios = normalizarIdsTexto(pagos.map((p) => p.idmedio));
-    const mediosPago = await obtenerMediosPagoEmpresa(pagos, req.idempresa);
+    const idsMedios = normalizarIdsNumericos(pagosNormalizados.map((p) => p.idmedio));
+    const mediosPago = await obtenerMediosPagoEmpresa(pagosNormalizados, idempresa);
 
-    if (pagos.length > 0 && mediosPago.length !== idsMedios.length) {
+    if (pagosNormalizados.length > 0 && mediosPago.length !== idsMedios.length) {
       return res.status(400).json({
         success: false,
         error: "Uno o más medios de pago no pertenecen a la empresa activa",
@@ -753,30 +918,30 @@ router.post("/prefactura", async (req, res) => {
       RETURNING *
       `,
       [
-        req.idempresa,
-        idcliente,
+        idempresa,
+        idclienteLimpio,
         totalFactura,
-        req.user.idusuario,
+        idusuario,
       ]
     );
 
     const factura = resultFactura.rows[0];
 
     await registrarDetallesFactura({
-      idempresa: req.idempresa,
+      idempresa,
       idfactura: factura.idfactura,
       detalles: detallesRecalculados,
     });
 
     await registrarPagosFactura({
-      idempresa: req.idempresa,
+      idempresa,
       idfactura: factura.idfactura,
-      pagos,
+      pagos: pagosNormalizados,
     });
 
     const detallesDB = await obtenerDescripcionesDetalles(
       factura.idfactura,
-      req.idempresa
+      idempresa
     );
 
     const observacionesFinal = construirObservaciones(observaciones, detallesDB);
@@ -784,7 +949,7 @@ router.post("/prefactura", async (req, res) => {
     const siigoStylePayload = buildSiigoStylePayload({
       cliente,
       detalles: detallesRecalculados,
-      pagos,
+      pagos: pagosNormalizados,
       total: totalFactura,
       observaciones: observacionesFinal,
       productosMap,
@@ -821,6 +986,7 @@ router.post("/prefactura", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error creando prefactura",
+      detail: error.message,
     });
   }
 });
@@ -829,7 +995,9 @@ router.post("/prefactura", async (req, res) => {
 
 router.put("/prefactura/:id", async (req, res) => {
   try {
-    const { id } = req.params;
+    const idempresa = normalizarIdEmpresa(req);
+    const idusuario = obtenerIdUsuario(req);
+    const idfactura = normalizarIdEntero(req.params.id);
 
     const {
       idcliente,
@@ -839,12 +1007,43 @@ router.put("/prefactura/:id", async (req, res) => {
       enviar = false,
     } = req.body;
 
-    if (!idcliente || !Array.isArray(detalles) || detalles.length === 0) {
+    if (!idempresa) {
       return res.status(400).json({
         success: false,
-        error: "Cliente y detalles son obligatorios",
+        error: "No hay empresa activa",
       });
     }
+
+    if (!idusuario) {
+      return res.status(400).json({
+        success: false,
+        error: "Usuario inválido",
+      });
+    }
+
+    if (!idfactura) {
+      return res.status(400).json({
+        success: false,
+        error: "Prefactura inválida",
+      });
+    }
+
+    const validacion = validarPayloadFactura({
+      idcliente,
+      detalles,
+      pagos,
+    });
+
+    if (!validacion.ok) {
+      return res.status(400).json({
+        success: false,
+        error: validacion.error,
+      });
+    }
+
+    const idclienteLimpio = validacion.idcliente;
+    const detallesNormalizados = validacion.detalles;
+    const pagosNormalizados = validacion.pagos;
 
     const facturaResult = await query(
       `
@@ -854,7 +1053,7 @@ router.put("/prefactura/:id", async (req, res) => {
         AND idempresa = $2
       LIMIT 1
       `,
-      [id, req.idempresa]
+      [idfactura, idempresa]
     );
 
     if (facturaResult.rows.length === 0) {
@@ -873,7 +1072,7 @@ router.put("/prefactura/:id", async (req, res) => {
       });
     }
 
-    const cliente = await obtenerClienteEmpresa(idcliente, req.idempresa);
+    const cliente = await obtenerClienteEmpresa(idclienteLimpio, idempresa);
 
     if (!cliente) {
       return res.status(404).json({
@@ -882,8 +1081,8 @@ router.put("/prefactura/:id", async (req, res) => {
       });
     }
 
-    const idsProductos = normalizarIdsNumericos(detalles.map((d) => d.idproducto));
-    const productos = await obtenerProductosEmpresa(detalles, req.idempresa);
+    const idsProductos = normalizarIdsNumericos(detallesNormalizados.map((d) => d.idproducto));
+    const productos = await obtenerProductosEmpresa(detallesNormalizados, idempresa);
 
     if (productos.length !== idsProductos.length) {
       return res.status(400).json({
@@ -903,11 +1102,10 @@ router.put("/prefactura/:id", async (req, res) => {
       ])
     );
 
-    const detallesRecalculados = recalcularDetalles(detalles, productosMap);
+    const detallesRecalculados = recalcularDetalles(detallesNormalizados, productosMap);
 
-    const totalFactura = detallesRecalculados.reduce(
-      (acc, d) => acc + Number(d.subtotal || 0),
-      0
+    const totalFactura = normalizarValor(
+      detallesRecalculados.reduce((acc, d) => acc + Number(d.subtotal || 0), 0)
     );
 
     if (totalFactura <= 0) {
@@ -917,10 +1115,10 @@ router.put("/prefactura/:id", async (req, res) => {
       });
     }
 
-    const idsMedios = normalizarIdsTexto(pagos.map((p) => p.idmedio));
-    const medios = await obtenerMediosPagoEmpresa(pagos, req.idempresa);
+    const idsMedios = normalizarIdsNumericos(pagosNormalizados.map((p) => p.idmedio));
+    const medios = await obtenerMediosPagoEmpresa(pagosNormalizados, idempresa);
 
-    if (pagos.length > 0 && medios.length !== idsMedios.length) {
+    if (pagosNormalizados.length > 0 && medios.length !== idsMedios.length) {
       return res.status(400).json({
         success: false,
         error: "Uno o más medios de pago no pertenecen a la empresa activa",
@@ -942,11 +1140,11 @@ router.put("/prefactura/:id", async (req, res) => {
         AND idempresa = $5
       `,
       [
-        idcliente,
+        idclienteLimpio,
         totalFactura,
-        req.user.idusuario,
-        id,
-        req.idempresa,
+        idusuario,
+        idfactura,
+        idempresa,
       ]
     );
 
@@ -956,7 +1154,7 @@ router.put("/prefactura/:id", async (req, res) => {
       WHERE idfactura = $1
         AND idempresa = $2
       `,
-      [id, req.idempresa]
+      [idfactura, idempresa]
     );
 
     await query(
@@ -965,28 +1163,28 @@ router.put("/prefactura/:id", async (req, res) => {
       WHERE idfactura = $1
         AND idempresa = $2
       `,
-      [id, req.idempresa]
+      [idfactura, idempresa]
     );
 
     await registrarDetallesFactura({
-      idempresa: req.idempresa,
-      idfactura: id,
+      idempresa,
+      idfactura,
       detalles: detallesRecalculados,
     });
 
     await registrarPagosFactura({
-      idempresa: req.idempresa,
-      idfactura: id,
-      pagos,
+      idempresa,
+      idfactura,
+      pagos: pagosNormalizados,
     });
 
-    const detallesDB = await obtenerDescripcionesDetalles(id, req.idempresa);
+    const detallesDB = await obtenerDescripcionesDetalles(idfactura, idempresa);
     const observacionesFinal = construirObservaciones(observaciones, detallesDB);
 
     const siigoPayload = buildSiigoStylePayload({
       cliente,
       detalles: detallesRecalculados,
-      pagos,
+      pagos: pagosNormalizados,
       total: totalFactura,
       observaciones: observacionesFinal,
       productosMap,
@@ -1005,14 +1203,14 @@ router.put("/prefactura/:id", async (req, res) => {
         )
         VALUES ($1, $2, '{}', false, 'Prefactura actualizada')
         `,
-        [id, JSON.stringify(siigoPayload)]
+        [idfactura, JSON.stringify(siigoPayload)]
       );
 
       return res.json({
         success: true,
         message: "Prefactura actualizada correctamente",
         factura: {
-          idfactura: Number(id),
+          idfactura,
           total: totalFactura,
         },
         siigo: "Sin envío",
@@ -1048,8 +1246,8 @@ router.put("/prefactura/:id", async (req, res) => {
           siigoResponse.name,
           siigoResponse.public_url,
           siigoResponse.stamp?.cufe || null,
-          id,
-          req.idempresa,
+          idfactura,
+          idempresa,
         ]
       );
     } catch (error) {
@@ -1066,7 +1264,7 @@ router.put("/prefactura/:id", async (req, res) => {
         WHERE idfactura = $1
           AND idempresa = $2
         `,
-        [id, req.idempresa]
+        [idfactura, idempresa]
       );
 
       mensaje = "Prefactura actualizada, pero quedó pendiente de envío a Siigo";
@@ -1084,7 +1282,7 @@ router.put("/prefactura/:id", async (req, res) => {
       VALUES ($1, $2, $3, $4, $5)
       `,
       [
-        id,
+        idfactura,
         JSON.stringify(siigoPayload),
         JSON.stringify(siigoResponse || {}),
         exito,
@@ -1096,7 +1294,7 @@ router.put("/prefactura/:id", async (req, res) => {
       success: true,
       message: mensaje,
       factura: {
-        idfactura: Number(id),
+        idfactura,
         total: totalFactura,
       },
       siigo: siigoResponse,
@@ -1107,6 +1305,7 @@ router.put("/prefactura/:id", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error actualizando prefactura",
+      detail: error.message,
     });
   }
 });
@@ -1115,7 +1314,22 @@ router.put("/prefactura/:id", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const { id } = req.params;
+    const idempresa = normalizarIdEmpresa(req);
+    const idfactura = normalizarIdEntero(req.params.id);
+
+    if (!idempresa) {
+      return res.status(400).json({
+        success: false,
+        error: "No hay empresa activa",
+      });
+    }
+
+    if (!idfactura) {
+      return res.status(400).json({
+        success: false,
+        error: "Factura inválida",
+      });
+    }
 
     const facturaSQL = `
       SELECT 
@@ -1149,7 +1363,7 @@ router.get("/:id", async (req, res) => {
       LIMIT 1
     `;
 
-    const facturaResult = await query(facturaSQL, [id, req.idempresa]);
+    const facturaResult = await query(facturaSQL, [idfactura, idempresa]);
 
     if (facturaResult.rows.length === 0) {
       return res.status(404).json({
@@ -1184,7 +1398,7 @@ router.get("/:id", async (req, res) => {
       ORDER BY d.iddetalle ASC
     `;
 
-    const detalles = (await query(detallesSQL, [id, req.idempresa])).rows;
+    const detalles = (await query(detallesSQL, [idfactura, idempresa])).rows;
 
     const pagosSQL = `
       SELECT 
@@ -1206,7 +1420,7 @@ router.get("/:id", async (req, res) => {
       ORDER BY fp.idfacturapago ASC
     `;
 
-    const pagos = (await query(pagosSQL, [id, req.idempresa])).rows;
+    const pagos = (await query(pagosSQL, [idfactura, idempresa])).rows;
 
     return res.json({
       success: true,
@@ -1228,6 +1442,7 @@ router.get("/:id", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Error consultando factura",
+      detail: error.message,
     });
   }
 });
