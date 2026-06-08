@@ -99,12 +99,24 @@
 
     .item {
       margin-bottom: 2mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .item-name {
       font-weight: 700;
       text-transform: uppercase;
       word-break: break-word;
+    }
+
+    .item-detail span:first-child {
+      flex: 1;
+    }
+
+    .item-detail span:last-child {
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 700;
     }
 
     .total-row {
@@ -148,6 +160,11 @@
       body,
       .ticket {
         margin: 0;
+      }
+
+      .ticket {
+        height: auto !important;
+        overflow: visible !important;
       }
     }
   </style>
@@ -250,8 +267,8 @@
 
     <!-- TOTALES -->
     {% set total_base = factura.total|float if factura.total else 0 %}
-    {% set servicio = total_base * 0.10 %}
-    {% set total_con_servicio = total_base + servicio %}
+    {% set servicio_voluntario = total_base * 0.10 %}
+    {% set total_con_servicio = total_base + servicio_voluntario %}
 
     <div class="total-row">
       <span>TOTAL</span>
@@ -263,7 +280,7 @@
     <div class="row">
       <span class="label">Servicio voluntario 10%:</span>
       <span class="value">
-        ${{ "{:,.0f}".format(servicio).replace(",", ".") }}
+        ${{ "{:,.0f}".format(servicio_voluntario).replace(",", ".") }}
       </span>
     </div>
 
@@ -272,6 +289,13 @@
       <span>
         ${{ "{:,.0f}".format(total_con_servicio).replace(",", ".") }}
       </span>
+    </div>
+
+    <div class="line"></div>
+
+    <!-- NOTA SERVICIO -->
+    <div class="center small">
+      El servicio del 10% es voluntario.
     </div>
 
     <div class="line"></div>
