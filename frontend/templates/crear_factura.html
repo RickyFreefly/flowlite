@@ -56,7 +56,7 @@
           action="{{ url_for('facturas.actualizar_prefactura', id=factura.idfactura) }}"
           class="invoice-form"
           id="invoiceForm"
-          onsubmit="return validarSaldoSeguro()">
+          onsubmit="return validarSubmitFactura(event)">
 
       <input type="hidden" id="enviarFlag" name="enviar" value="false">
       <input type="hidden" name="idfactura" value="{{ factura.idfactura }}">
@@ -66,7 +66,7 @@
           action="{{ url_for('facturas.crear_factura') }}"
           class="invoice-form"
           id="invoiceForm"
-          onsubmit="return validarSaldoSeguro()">
+          onsubmit="return validarSubmitFactura(event)">
   {% endif %}
 
     <!-- No enviar idempresa ni idusuario desde HTML -->
@@ -1164,7 +1164,23 @@ function enviarFacturaFinal() {
   }
 }
 
-function validarSaldoSeguro() {
+function validarSubmitFactura(event) {
+  const flag = document.getElementById("enviarFlag");
+  const esEdicionPrefactura = Boolean(flag);
+  const esEnvioFinal = esEdicionPrefactura && flag.value === "true";
+
+  /*
+    En edición de prefactura:
+    - Guardar cambios debe permitirse aunque exista saldo pendiente.
+    - Enviar a SIIGO/factura final sí exige saldo en cero.
+
+    En creación normal, la validación de saldo la ejecuta enviarFacturaFinal()
+    antes de permitir el submit.
+  */
+  if (esEdicionPrefactura && !esEnvioFinal) {
+    return true;
+  }
+
   return validarSaldo();
 }
 
@@ -1786,7 +1802,16 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       {% endif %}
 
-      if (!validarSaldo()) {
+      const flag = document.getElementById("enviarFlag");
+      const esEdicionPrefactura = Boolean(flag);
+      const esEnvioFinal = esEdicionPrefactura && flag.value === "true";
+
+      /*
+        Solo se bloquea por saldo pendiente cuando realmente se está enviando
+        la prefactura como factura final/SIIGO.
+        Guardar cambios de prefactura permite saldo pendiente.
+      */
+      if (esEnvioFinal && !validarSaldo()) {
         event.preventDefault();
         event.stopPropagation();
         form.dataset.allowSubmit = "false";
